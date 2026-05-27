@@ -1,0 +1,11 @@
+{
+  "name": "default",
+  "description": "Balanced, slightly consonant-heavy",
+  "initial_consonants": ["k", "v", "th", "dr", "str", "m", "r", "s", "n", "br"],
+  "medial_consonants": ["l", "r", "n", "v", "th", "s"],
+  "final_consonants": ["n", "r", "s", "th", "k", "x", "l"],
+  "vowels": ["a", "e", "i", "o", "u", "ai", "ae", "ei", "ou"],
+  "patterns": ["CVC", "CVC", "CVVC", "CCV", "CCVC", "VC"],
+  "syllable_count": [1, 2, 2, 2, 3],
+  "joining_vowels": ["a", "e", "i", "o", ""]
+}

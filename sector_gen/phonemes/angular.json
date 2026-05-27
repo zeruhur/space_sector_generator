@@ -1,0 +1,11 @@
+{
+  "name": "angular",
+  "description": "Harsh, hard stops; good for militaristic or industrial cultures",
+  "initial_consonants": ["kr", "vx", "str", "gh", "dr", "zt", "kh", "br", "gr", "sk"],
+  "medial_consonants": ["k", "g", "r", "th", "x", "n"],
+  "final_consonants": ["k", "x", "n", "r", "th", "s", "kt", "st"],
+  "vowels": ["a", "e", "i", "aa", "ei"],
+  "patterns": ["CVC", "CVC", "CCVC", "CVCC", "CCVC", "CVC"],
+  "syllable_count": [1, 1, 2, 2, 3],
+  "joining_vowels": ["a", "e", ""]
+}

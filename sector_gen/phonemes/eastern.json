@@ -1,0 +1,11 @@
+{
+  "name": "eastern",
+  "description": "Rhythmic, alternating; good for ceremonial or ordered cultures",
+  "initial_consonants": ["k", "s", "t", "h", "n", "m", "sh", "ts"],
+  "medial_consonants": ["k", "s", "t", "n", "m", "sh"],
+  "final_consonants": ["", "n", "r", "shi", "ko"],
+  "vowels": ["a", "i", "u", "e", "o"],
+  "patterns": ["CV", "CVC", "CV", "CVC", "CV"],
+  "syllable_count": [2, 2, 3, 3, 4],
+  "joining_vowels": ["", ""]
+}

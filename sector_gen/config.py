@@ -1,0 +1,17 @@
+DENSITY_THRESHOLDS = {
+    'sparse': 5,
+    'standard': 4,
+    'dense': 3,
+    'cluster': 2,
+}
+
+SUBSECTOR_COLS = 8
+SUBSECTOR_ROWS = 10
+SUBSECTOR_LETTERS = 'ABCDEFGHIJKLMNOP'  # 4x4 grid, reading order
+SECTOR_SUBSECTORS_WIDE = 4
+SECTOR_SUBSECTORS_TALL = 4
+
+DEFAULT_DENSITY = 'standard'
+DEFAULT_PHONEMES = 'default'
+DEFAULT_SECTOR_NUMBER = '01'
+DEFAULT_REGION = 'GEN'

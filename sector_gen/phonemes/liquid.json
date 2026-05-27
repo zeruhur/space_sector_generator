@@ -1,0 +1,11 @@
+{
+  "name": "liquid",
+  "description": "Soft, vowel-heavy; good for ancient or organic cultures",
+  "initial_consonants": ["m", "r", "l", "n", "v", "s", "sh", "wh"],
+  "medial_consonants": ["l", "r", "n", "m", "v"],
+  "final_consonants": ["l", "n", "r", "m", ""],
+  "vowels": ["a", "ae", "ai", "ei", "ou", "io", "ua", "aua", "ia"],
+  "patterns": ["CVC", "CVVC", "CV", "VC", "CVC", "CVVC"],
+  "syllable_count": [1, 2, 2, 3, 3],
+  "joining_vowels": ["a", "e", "i", "o", "u"]
+}
