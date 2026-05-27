@@ -65,6 +65,15 @@ def _esc(s: str) -> str:
     return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
+def _display_profile(profile: str) -> str:
+    """Format a profile string for SVG display only.
+    Replaces Dx='-' (position 6) with '.' so the separator dash at position 7
+    is never doubled, without touching the TSV format."""
+    if len(profile) >= 7 and profile[6] == '-':
+        return profile[:6] + '.' + profile[7:]
+    return profile
+
+
 # ---------------------------------------------------------------------------
 # Route extraction
 # ---------------------------------------------------------------------------
@@ -162,9 +171,9 @@ def render_subsector(systems: dict, region: str, sector_name: str, subsector: st
     all_routes = note_routes if note_routes else inferred_routes
 
     tier_style = {
-        'Primary':   (2.0, '#000', ''),
-        'Secondary': (1.0, '#444', ''),
-        'Tertiary':  (0.5, '#888', '4,2'),
+        'Primary':   (4.0, '#000', ''),
+        'Secondary': (1.75, '#222', ''),
+        'Tertiary':  (0.75, '#999', '6,3'),
     }
     for sid1, sid2, tier in all_routes:
         s1 = systems.get(sid1)
@@ -190,7 +199,7 @@ def render_subsector(systems: dict, region: str, sector_name: str, subsector: st
                 continue
             cx, cy = _hex_center(col, row, size, margin)
             lines.append(_svg_circle(cx, cy, dot_r))
-            lines.append(_svg_text(cx, cy + profile_y_offset, s['profile'],
+            lines.append(_svg_text(cx, cy + profile_y_offset, _display_profile(s['profile']),
                                    font_size=profile_fs))
             lines.append(_svg_text(cx, cy + name_y_offset, s['name'],
                                    font_size=name_fs))

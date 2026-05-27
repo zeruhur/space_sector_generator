@@ -213,6 +213,27 @@ Example: `ORT-CAS-C0304` - Outer Rim region, Cassian Sector, subsector C, hex co
 
 This identifier is the primary key for all data about that system. Names, annotations, and extended detail are layered on top of it but the identifier never changes.
 
+### Assigning RegionCode and SectorCode
+
+**RegionCode** is derived from the region's proper name by taking its first three letters, uppercased. If that code already exists in the universe, a fourth letter is appended to disambiguate. The referee confirms uniqueness against all existing codes before generating.
+
+```
+Outer Reach   →  OUT
+Cassian Belt  →  CAS
+Vordun Arc    →  VOR
+```
+
+**SectorCode** is derived from the sector's proper name by the same rule - first three letters uppercased - plus a sequential two-digit index representing the order in which the sector was created within its region. The index starts at 01 and increments with each new sector added to that region. It is a creation-order index, not a spatial coordinate.
+
+```
+Cassian Sector, first created in its region    →  CAS-01
+Cassian Expanse, second created, name collides →  CASe-02
+```
+
+Spatial relationships between sectors are expressed on the map, not in the code. The code exists only to be unique and stable.
+
+**SubsectorLetter** is assigned by position within the sector: A through P in reading order, left to right, top to bottom. A is the top-left subsector, P is the bottom-right. This is fixed by the grid and requires no decision.
+
 ---
 
 ## Generation procedure

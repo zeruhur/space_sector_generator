@@ -160,16 +160,16 @@
 <text x="378.00" y="454.23" font-size="6.16" text-anchor="middle" fill="#aaa" font-family="monospace">0809</text>
 <polygon points="404.60,516.73 391.30,539.76 364.70,539.76 351.40,516.73 364.70,493.69 391.30,493.69" fill="none" stroke="#888" stroke-width="0.5"/>
 <text x="378.00" y="502.73" font-size="6.16" text-anchor="middle" fill="#aaa" font-family="monospace">0810</text>
-<line x1="252.00" y1="492.48" x2="210.00" y2="468.23" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="210.00" y1="419.73" x2="210.00" y2="468.23" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="84.00" y1="395.48" x2="126.00" y2="419.73" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="210.00" y1="516.73" x2="210.00" y2="468.23" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="126.00" y1="419.73" x2="84.00" y2="443.98" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="126.00" y1="419.73" x2="168.00" y2="443.98" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="336.00" y1="104.50" x2="378.00" y2="128.75" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="336.00" y1="104.50" x2="336.00" y2="152.99" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="294.00" y1="274.24" x2="294.00" y2="225.74" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
-<line x1="168.00" y1="443.98" x2="210.00" y2="468.23" stroke="#888" stroke-width="0.5" stroke-dasharray="4,2"/>
+<line x1="336.00" y1="152.99" x2="336.00" y2="104.50" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="84.00" y1="443.98" x2="126.00" y2="419.73" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="84.00" y1="395.48" x2="126.00" y2="419.73" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="294.00" y1="225.74" x2="294.00" y2="274.24" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="336.00" y1="104.50" x2="378.00" y2="128.75" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="210.00" y1="468.23" x2="210.00" y2="516.73" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="210.00" y1="468.23" x2="252.00" y2="492.48" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="210.00" y1="468.23" x2="210.00" y2="419.73" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="210.00" y1="468.23" x2="168.00" y2="443.98" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
+<line x1="126.00" y1="419.73" x2="168.00" y2="443.98" stroke="#999" stroke-width="0.75" stroke-dasharray="6,3"/>
 <circle cx="84.00" cy="104.50" r="3.08" fill="#000"/>
 <text x="84.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">32M1V0P-1T</text>
 <text x="84.00" y="117.94" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Uthivaiox</text>
@@ -186,8 +186,8 @@
 <text x="84.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">32M2L2R-1H</text>
 <text x="84.00" y="408.92" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Naer</text>
 <circle cx="84.00" cy="443.98" r="3.08" fill="#000"/>
-<text x="84.00" y="450.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22M1A3--1H</text>
-<text x="84.00" y="457.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Mbraiosdrathobriaex</text>
+<text x="84.00" y="450.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22M1A3.-1H</text>
+<text x="84.00" y="457.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Mbraiosdrathob</text>
 <circle cx="126.00" cy="128.75" r="3.08" fill="#000"/>
 <text x="126.00" y="134.91" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">54X0V0P-0T</text>
 <text x="126.00" y="142.19" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Susisdrix</text>
@@ -204,10 +204,10 @@
 <text x="126.00" y="425.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">32T1A5X-2H</text>
 <text x="126.00" y="433.17" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Reiaesstroun</text>
 <circle cx="126.00" cy="516.73" r="3.08" fill="#000"/>
-<text x="126.00" y="522.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22I1E1--1H</text>
+<text x="126.00" y="522.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22I1E1.-1H</text>
 <text x="126.00" y="530.17" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Sailik</text>
 <circle cx="168.00" cy="104.50" r="3.08" fill="#000"/>
-<text x="168.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52I1V3--0H</text>
+<text x="168.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52I1V3.-0H</text>
 <text x="168.00" y="117.94" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Elibrthu</text>
 <circle cx="168.00" cy="249.99" r="3.08" fill="#000"/>
 <text x="168.00" y="256.15" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53C0V0W-0H</text>
@@ -216,16 +216,16 @@
 <text x="168.00" y="304.65" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53X2A2P-0H</text>
 <text x="168.00" y="311.93" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Eikabran</text>
 <circle cx="168.00" cy="395.48" r="3.08" fill="#000"/>
-<text x="168.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53I0V1--0H</text>
+<text x="168.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53I0V1.-0H</text>
 <text x="168.00" y="408.92" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Nthaeael</text>
 <circle cx="168.00" cy="443.98" r="3.08" fill="#000"/>
-<text x="168.00" y="450.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">33M1A2--1H</text>
+<text x="168.00" y="450.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">33M1A2.-1H</text>
 <text x="168.00" y="457.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Rueirivni</text>
 <circle cx="210.00" cy="371.23" r="3.08" fill="#000"/>
 <text x="210.00" y="377.39" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">40M3A3W-1H</text>
 <text x="210.00" y="384.67" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Ser</text>
 <circle cx="210.00" cy="419.73" r="3.08" fill="#000"/>
-<text x="210.00" y="425.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22M2A2--1H</text>
+<text x="210.00" y="425.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">22M2A2.-1H</text>
 <text x="210.00" y="433.17" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Theinaun</text>
 <circle cx="210.00" cy="468.23" r="3.08" fill="#000"/>
 <text x="210.00" y="474.39" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">21I3C1W-2H</text>
@@ -234,13 +234,13 @@
 <text x="210.00" y="522.89" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">41M2C2R-1H</text>
 <text x="210.00" y="530.17" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Kvun</text>
 <circle cx="252.00" cy="104.50" r="3.08" fill="#000"/>
-<text x="252.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52T1A4--1H</text>
+<text x="252.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52T1A4.-1H</text>
 <text x="252.00" y="117.94" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Dreinostrbreik</text>
 <circle cx="252.00" cy="346.98" r="3.08" fill="#000"/>
 <text x="252.00" y="353.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">21C2L3W-1H</text>
-<text x="252.00" y="360.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Straikidrelirstrus</text>
+<text x="252.00" y="360.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Straikidrelirs</text>
 <circle cx="252.00" cy="395.48" r="3.08" fill="#000"/>
-<text x="252.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">43M1E2--0H</text>
+<text x="252.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">43M1E2.-0H</text>
 <text x="252.00" y="408.92" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Drousaaenavuix</text>
 <circle cx="252.00" cy="492.48" r="3.08" fill="#000"/>
 <text x="252.00" y="498.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52I3L2R-1H</text>
@@ -252,7 +252,7 @@
 <text x="294.00" y="231.90" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">33I1E0R-1H</text>
 <text x="294.00" y="239.18" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Kexdrith</text>
 <circle cx="294.00" cy="274.24" r="3.08" fill="#000"/>
-<text x="294.00" y="280.40" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">43T3S2--2H</text>
+<text x="294.00" y="280.40" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">43T3S2.-2H</text>
 <text x="294.00" y="287.68" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Brirekstreik</text>
 <circle cx="294.00" cy="371.23" r="3.08" fill="#000"/>
 <text x="294.00" y="377.39" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52M0V0X-0H</text>
@@ -262,7 +262,7 @@
 <text x="294.00" y="433.17" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Naianithstreix</text>
 <circle cx="336.00" cy="104.50" r="3.08" fill="#000"/>
 <text x="336.00" y="110.66" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">11M2A3T-2H</text>
-<text x="336.00" y="117.94" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Mstraeomiaesonthan</text>
+<text x="336.00" y="117.94" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Mstraeomiaeson</text>
 <circle cx="336.00" cy="152.99" r="3.08" fill="#000"/>
 <text x="336.00" y="159.15" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">52T2A3R-1H</text>
 <text x="336.00" y="166.43" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Drak</text>
@@ -270,19 +270,19 @@
 <text x="336.00" y="353.14" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">31M3L2P-1H</text>
 <text x="336.00" y="360.42" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Eithendrek</text>
 <circle cx="336.00" cy="395.48" r="3.08" fill="#000"/>
-<text x="336.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53T1E1--1H</text>
+<text x="336.00" y="401.64" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">53T1E1.-1H</text>
 <text x="336.00" y="408.92" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Draxivstror</text>
 <circle cx="378.00" cy="80.25" r="3.08" fill="#000"/>
 <text x="378.00" y="86.41" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">54M2C1X-0T</text>
 <text x="378.00" y="93.69" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Voththaeouth</text>
 <circle cx="378.00" cy="128.75" r="3.08" fill="#000"/>
-<text x="378.00" y="134.91" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">32T1A2--1H</text>
+<text x="378.00" y="134.91" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">32T1A2.-1H</text>
 <text x="378.00" y="142.19" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Uxakstra</text>
 <circle cx="378.00" cy="225.74" r="3.08" fill="#000"/>
 <text x="378.00" y="231.90" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">41M1A2P-0H</text>
 <text x="378.00" y="239.18" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Ul</text>
 <circle cx="378.00" cy="274.24" r="3.08" fill="#000"/>
-<text x="378.00" y="280.40" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">44C1A3--0H</text>
+<text x="378.00" y="280.40" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">44C1A3.-0H</text>
 <text x="378.00" y="287.68" font-size="6.72" text-anchor="middle" fill="#000" font-family="monospace">Rrouaaik</text>
 <circle cx="378.00" cy="322.74" r="3.08" fill="#000"/>
 <text x="378.00" y="328.90" font-size="5.32" text-anchor="middle" fill="#000" font-family="monospace">54M0V0X-0H</text>

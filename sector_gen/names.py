@@ -3,6 +3,7 @@ import random
 from pathlib import Path
 
 PHONEMES_DIR = Path(__file__).parent / 'phonemes'
+MAX_NAME_LENGTH = 14
 
 
 def load_register(name: str) -> dict:
@@ -42,7 +43,8 @@ def generate_name(register: dict, seed_string: str) -> str:
         name = joiner.join(syllables)
     else:
         name = syllables[0]
-    return name.capitalize() if name else 'Unknown'
+    name = name.capitalize() if name else 'Unknown'
+    return name[:MAX_NAME_LENGTH]
 
 
 def test():
@@ -52,5 +54,5 @@ def test():
         names = [generate_name(reg, f'TEST-XX-A{i:04d}') for i in range(20)]
         for n in names:
             assert n, f"Empty name from register {reg_name}"
-            assert 1 <= len(n) <= 30, f"Name {n!r} has unexpected length from register {reg_name}"
+            assert 1 <= len(n) <= MAX_NAME_LENGTH, f"Name {n!r} exceeds max length from register {reg_name}"
     print("names: all tests passed")
