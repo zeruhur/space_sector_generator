@@ -64,6 +64,35 @@ def hexes_for_sector(region: str, sector_name: str) -> list:
     return ids
 
 
+def derive_code(name: str, existing_codes: set, length: int = 3) -> str:
+    """Derive a short uppercase code from a human-readable name.
+
+    Strips non-alphabetic characters, uppercases, and takes the first `length`
+    characters as the candidate code. If that candidate is already in
+    `existing_codes`, appends the next character from the cleaned name and
+    retries, continuing until a unique code is found or the full name is
+    exhausted. Raises ValueError (with a message asking the user to rename) if
+    no unique code can be derived.
+    """
+    clean = re.sub(r'[^A-Za-z]', '', name).upper()
+    if not clean:
+        raise ValueError(f"Name {name!r} contains no alphabetic characters")
+
+    candidate = clean[:length]
+    if candidate not in existing_codes:
+        return candidate
+
+    for i in range(length + 1, len(clean) + 1):
+        candidate = clean[:i]
+        if candidate not in existing_codes:
+            return candidate
+
+    raise ValueError(
+        f"Cannot derive a unique code for {name!r}: every variant up to "
+        f"{clean!r} conflicts with an existing code. Please rename."
+    )
+
+
 def subsector_index(letter: str) -> tuple:
     """Return (col_index, row_index) of a subsector within its sector (0-based)."""
     idx = SUBSECTOR_LETTERS.index(letter)

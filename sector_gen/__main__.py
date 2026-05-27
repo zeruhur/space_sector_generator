@@ -4,19 +4,18 @@ import argparse
 import sys
 from pathlib import Path
 
-from .config import (DEFAULT_DENSITY, DEFAULT_PHONEMES, DEFAULT_REGION,
-                     DEFAULT_SECTOR_NUMBER, SUBSECTOR_LETTERS)
-from .coordinates import (build_canonical_id, hexes_for_sector,
-                           hexes_for_subsector, parse_canonical_id)
+from .config import (DEFAULT_DENSITY, DEFAULT_PHONEMES, DEFAULT_SECTOR_NUMBER,
+                     SUBSECTOR_LETTERS)
+from .coordinates import (build_canonical_id, derive_code, hexes_for_subsector,
+                           parse_canonical_id)
 from .generator import generate_system
-from .io import (confirm_overwrite, get_pending_links, load_tsv, merge,
-                 save_tsv, write_tsv_stdout)
+from .io import (confirm_overwrite, load_tsv, merge, save_tsv, write_tsv_stdout)
 from .names import load_register
 from .network import run_network_pass, resolve_pending_links
 
 
 # ---------------------------------------------------------------------------
-# Shared helpers
+# Shared generation helpers (unchanged)
 # ---------------------------------------------------------------------------
 
 def _load_register_safe(name: str) -> dict:
@@ -27,20 +26,11 @@ def _load_register_safe(name: str) -> dict:
         sys.exit(1)
 
 
-def _parse_system_id(arg: str) -> dict:
-    try:
-        return parse_canonical_id(arg)
-    except ValueError as e:
-        print(f"error: {e}", file=sys.stderr)
-        sys.exit(1)
-
-
 def _generate_subsector(region: str, sector_name: str, sector_number: str,
                          subsector: str, density: str, register: dict) -> dict:
     sector_id = f"{sector_name}-{sector_number}"
-    hex_ids = hexes_for_subsector(region, sector_name, subsector)
     systems = {}
-    for cid in hex_ids:
+    for cid in hexes_for_subsector(region, sector_name, subsector):
         s = generate_system(cid, sector_id, density=density, register=register)
         if s:
             systems[cid] = s
@@ -52,73 +42,11 @@ def _generate_sector(region: str, sector_name: str, sector_number: str,
                       density: str, register: dict) -> dict:
     all_systems = {}
     for sub in SUBSECTOR_LETTERS:
-        sub_systems = _generate_subsector(region, sector_name, sector_number,
-                                          sub, density, register)
-        all_systems.update(sub_systems)
-    # Resolve any cross-subsector pending links now that all subsectors exist
+        all_systems.update(
+            _generate_subsector(region, sector_name, sector_number, sub, density, register)
+        )
     resolve_pending_links(all_systems)
     return all_systems
-
-
-# ---------------------------------------------------------------------------
-# Command: generate
-# ---------------------------------------------------------------------------
-
-def cmd_generate(args) -> None:
-    register = _load_register_safe(args.phonemes)
-    scope = args.scope
-    density = args.density
-
-    if scope == 'region':
-        n = args.sectors
-        import math
-        # Lay out N sectors in a grid, auto-assign names
-        import string
-        sector_names = [f"S{i+1:02d}" for i in range(n)]
-        region = args.region or DEFAULT_REGION
-        all_systems = {}
-        for sname in sector_names:
-            s_systems = _generate_sector(region, sname, '01', density, register)
-            all_systems.update(s_systems)
-        resolve_pending_links(all_systems)
-        _output(all_systems, args)
-        return
-
-    if scope == 'sector':
-        sid = args.id
-        if not sid:
-            print("error: --id is required for scope=sector (e.g. CAS-01)", file=sys.stderr)
-            sys.exit(1)
-        region, sector_name, sector_number = _split_sector_id(sid, args.region)
-        systems = _generate_sector(region, sector_name, sector_number, density, register)
-        _output(systems, args)
-        return
-
-    if scope == 'subsector':
-        sid = args.id
-        if not sid:
-            print("error: --id is required for scope=subsector (e.g. CAS-01-C)", file=sys.stderr)
-            sys.exit(1)
-        region, sector_name, sector_number, subsector = _split_subsector_id(sid, args.region)
-        systems = _generate_subsector(region, sector_name, sector_number, subsector,
-                                       density, register)
-        _output(systems, args)
-        return
-
-    if scope == 'system':
-        sid = args.id
-        if not sid:
-            print("error: --id is required for scope=system (e.g. ORT-CAS-C0304)", file=sys.stderr)
-            sys.exit(1)
-        parts = _parse_system_id(sid)
-        sector_id = f"{parts['sector_name']}-{DEFAULT_SECTOR_NUMBER}"
-        s = generate_system(sid, sector_id, density=density, register=register)
-        if not s:
-            print(f"Empty hex: {sid}", file=sys.stderr)
-            sys.exit(0)
-        systems = {sid: s}
-        systems, _ = run_network_pass(systems)
-        _output(systems, args)
 
 
 def _output(systems: dict, args) -> None:
@@ -130,43 +58,177 @@ def _output(systems: dict, args) -> None:
         write_tsv_stdout(systems)
 
 
-def _split_sector_id(sid: str, region_arg: str) -> tuple:
-    """Parse 'REGION-NAME-NUM', 'REGION-NAME', 'NAME-NUM', or 'NAME'."""
-    parts = sid.split('-')
-    if len(parts) == 3:
-        return parts[0], parts[1], parts[2]
-    if len(parts) == 2:
-        # Could be REGION-NAME or NAME-NUM
-        if parts[1].isdigit():
-            region = region_arg or DEFAULT_REGION
-            return region, parts[0], parts[1]
-        region = region_arg or DEFAULT_REGION
-        return region, parts[0], parts[1]
-    if len(parts) == 1:
-        region = region_arg or DEFAULT_REGION
-        return region, parts[0], DEFAULT_SECTOR_NUMBER
-    print(f"error: cannot parse sector id {sid!r}", file=sys.stderr)
-    sys.exit(1)
+# ---------------------------------------------------------------------------
+# Code-derivation helpers
+# ---------------------------------------------------------------------------
+
+def _extract_existing_codes(systems: dict) -> tuple:
+    """Return (region_code_set, {sector_code: set_of_region_codes}) from a TSV."""
+    region_codes: set = set()
+    sector_code_map: dict = {}
+    for s in systems.values():
+        r = s.get('region', '').strip()
+        sec = s.get('sector', '').strip()
+        sec_code = sec.split('-')[0] if '-' in sec else sec
+        if r:
+            region_codes.add(r)
+        if sec_code:
+            sector_code_map.setdefault(sec_code, set()).add(r)
+    return region_codes, sector_code_map
 
 
-def _split_subsector_id(sid: str, region_arg: str) -> tuple:
-    """Parse 'REGION-NAME-NUM-LETTER' down to 'NAME-NUM-LETTER'."""
-    parts = sid.split('-')
-    if len(parts) == 4:
-        return parts[0], parts[1], parts[2], parts[3]
-    if len(parts) == 3:
-        if parts[2].upper() in SUBSECTOR_LETTERS:
-            region = region_arg or DEFAULT_REGION
-            return region, parts[0], parts[1], parts[2].upper()
-        print(f"error: cannot parse subsector id {sid!r}", file=sys.stderr)
+def _derive_region_code(region_name: str, existing_codes: set) -> str:
+    """Derive region code from a human name; exits on unresolvable collision."""
+    try:
+        return derive_code(region_name, existing_codes)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
         sys.exit(1)
-    if len(parts) == 2:
-        if parts[1].upper() in SUBSECTOR_LETTERS:
-            region = region_arg or DEFAULT_REGION
-            return region, parts[0], DEFAULT_SECTOR_NUMBER, parts[1].upper()
-    print(f"error: cannot parse subsector id {sid!r}. Expected NAME-NUM-LETTER or REGION-NAME-NUM-LETTER",
-          file=sys.stderr)
+
+
+def _derive_sector_code(sector_name: str, existing_codes: set) -> str:
+    """Derive sector code from a human name; exits on unresolvable collision."""
+    try:
+        return derive_code(sector_name, existing_codes)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# --id parsing helpers (local forms used by generate and build)
+# ---------------------------------------------------------------------------
+
+def _parse_subsector_letter(id_arg: str | None) -> str:
+    """Accept a bare subsector letter (A-P), case-insensitive."""
+    if not id_arg:
+        print("error: --id (subsector letter, e.g. A) is required for scope=subsector",
+              file=sys.stderr)
+        sys.exit(1)
+    letter = id_arg.strip().upper()
+    if letter in SUBSECTOR_LETTERS:
+        return letter
+    print(
+        f"error: {id_arg!r} is not a valid subsector letter. Expected one of A-P",
+        file=sys.stderr,
+    )
     sys.exit(1)
+
+
+def _parse_system_local_id(id_arg: str | None, region_code: str,
+                            sector_code: str, sector_number: str) -> tuple:
+    """Parse system --id.
+
+    Accepts either a local 'LXXYY' (e.g. C0304) or a full canonical ID.
+    Returns (canonical_id, sector_id).
+    """
+    if not id_arg:
+        print("error: --id is required for scope=system (e.g. C0304 or ORT-CAS-C0304)",
+              file=sys.stderr)
+        sys.exit(1)
+
+    local = id_arg.strip()
+
+    # Full canonical format
+    try:
+        parts = parse_canonical_id(local)
+        sector_id = f"{parts['sector_name']}-{sector_number}"
+        return local, sector_id
+    except ValueError:
+        pass
+
+    # Local format: LXXYY (5 chars)
+    if (len(local) == 5
+            and local[0].upper() in SUBSECTOR_LETTERS
+            and local[1:3].isdigit()
+            and local[3:5].isdigit()):
+        sub = local[0].upper()
+        col, row = int(local[1:3]), int(local[3:5])
+        cid = build_canonical_id(region_code, sector_code, sub, col, row)
+        return cid, f"{sector_code}-{sector_number}"
+
+    print(
+        f"error: cannot parse system ID {id_arg!r}. "
+        f"Expected local form LXXYY (e.g. C0304) or full canonical ID (e.g. ORT-CAS-C0304)",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Command: generate
+# ---------------------------------------------------------------------------
+
+def cmd_generate(args) -> None:
+    register = _load_register_safe(args.phonemes)
+    scope = args.scope
+    density = args.density
+
+    # Load optional input TSV for code-collision checking
+    existing_systems: dict = {}
+    if args.input:
+        in_path = Path(args.input)
+        if not in_path.exists():
+            print(f"error: input file not found: {in_path}", file=sys.stderr)
+            sys.exit(1)
+        existing_systems = load_tsv(in_path)
+
+    existing_region_codes, existing_sector_code_map = _extract_existing_codes(existing_systems)
+    existing_sector_codes = set(existing_sector_code_map.keys())
+
+    # Derive region code (required for all scopes)
+    region_code = _derive_region_code(args.region_name, existing_region_codes)
+
+    # Derive sector code (required for sector / subsector / system)
+    sector_code = sector_number = None
+    if scope != 'region':
+        if not args.sector_name:
+            print("error: --sector-name is required for scope != region", file=sys.stderr)
+            sys.exit(1)
+        sector_code = _derive_sector_code(args.sector_name, existing_sector_codes)
+        sector_number = f"{args.sector_index:02d}"
+
+    # --- region ---
+    if scope == 'region':
+        n = args.sectors
+        all_systems: dict = {}
+        used_sector_codes = set(existing_sector_codes)
+        for i in range(n):
+            auto_name = f"Sector{i + 1:02d}"
+            try:
+                sc = derive_code(auto_name, used_sector_codes)
+            except ValueError:
+                sc = f"X{i + 1:03d}"[:4]
+            used_sector_codes.add(sc)
+            all_systems.update(_generate_sector(region_code, sc, '01', density, register))
+        resolve_pending_links(all_systems)
+        _output(all_systems, args)
+        return
+
+    # --- sector ---
+    if scope == 'sector':
+        systems = _generate_sector(region_code, sector_code, sector_number, density, register)
+        _output(systems, args)
+        return
+
+    # --- subsector ---
+    if scope == 'subsector':
+        sub = _parse_subsector_letter(args.id)
+        systems = _generate_subsector(region_code, sector_code, sector_number, sub,
+                                       density, register)
+        _output(systems, args)
+        return
+
+    # --- system ---
+    if scope == 'system':
+        cid, sector_id = _parse_system_local_id(args.id, region_code, sector_code, sector_number)
+        s = generate_system(cid, sector_id, density=density, register=register)
+        if not s:
+            print(f"Empty hex: {cid}", file=sys.stderr)
+            sys.exit(0)
+        systems = {cid: s}
+        systems, _ = run_network_pass(systems)
+        _output(systems, args)
 
 
 # ---------------------------------------------------------------------------
@@ -183,20 +245,43 @@ def cmd_build(args) -> None:
     register = _load_register_safe(args.phonemes)
     scope = args.scope
     density = args.density
-    sid = args.id
+
+    # Derive codes without exclusion — for build, the same code appearing in the
+    # file is expected (we're extending an existing entity, not creating a new one).
+    _, existing_sector_code_map = _extract_existing_codes(existing)
+
+    region_code = _derive_region_code(args.region_name, set())
+
+    if not args.sector_name:
+        print("error: --sector-name is required for build", file=sys.stderr)
+        sys.exit(1)
+    sector_code = _derive_sector_code(args.sector_name, set())
+
+    # Collision check: sector code already in file under a *different* region
+    if sector_code in existing_sector_code_map:
+        regions_using_code = existing_sector_code_map[sector_code]
+        if region_code not in regions_using_code:
+            other = sorted(regions_using_code)[0]
+            print(
+                f"error: sector name {args.sector_name!r} derives code {sector_code!r}, "
+                f"which already exists in the file under region {other!r} (not {region_code!r}). "
+                f"Please rename to avoid the conflict.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    sector_number = f"{args.sector_index:02d}"
 
     if scope == 'sector':
-        region, sector_name, sector_number = _split_sector_id(sid, args.region)
-        new_systems = _generate_sector(region, sector_name, sector_number, density, register)
+        new_systems = _generate_sector(region_code, sector_code, sector_number, density, register)
     elif scope == 'subsector':
-        region, sector_name, sector_number, subsector = _split_subsector_id(sid, args.region)
-        new_systems = _generate_subsector(region, sector_name, sector_number, subsector,
+        sub = _parse_subsector_letter(args.id)
+        new_systems = _generate_subsector(region_code, sector_code, sector_number, sub,
                                            density, register)
     elif scope == 'system':
-        parts = _parse_system_id(sid)
-        sector_id = f"{parts['sector_name']}-{DEFAULT_SECTOR_NUMBER}"
-        s = generate_system(sid, sector_id, density=density, register=register)
-        new_systems = {sid: s} if s else {}
+        cid, sector_id = _parse_system_local_id(args.id, region_code, sector_code, sector_number)
+        s = generate_system(cid, sector_id, density=density, register=register)
+        new_systems = {cid: s} if s else {}
         if new_systems:
             new_systems, _ = run_network_pass(new_systems)
     else:
@@ -243,6 +328,8 @@ def cmd_reroll(args) -> None:
     import random
     from .generator import (step_1_hz, step_2_rx, step_3_pp, step_4_pw,
                              step_5_ac, step_6_tn, step_7_dx, build_profile)
+    from .names import generate_name
+
     rng = random.Random(seed)
     hz = step_1_hz(rng)
     rx = step_2_rx(hz, rng)
@@ -251,8 +338,6 @@ def cmd_reroll(args) -> None:
     ac = step_5_ac(hz, pw, rng)
     tn = step_6_tn(pp, pw, rx, rng)
     dx = step_7_dx(hz, rx, rng)
-    name = load_register(args.phonemes)
-    from .names import generate_name
     new_name = generate_name(register, seed + '-name')
 
     systems[sid] = dict(old)
@@ -265,7 +350,6 @@ def cmd_reroll(args) -> None:
         '_col': int(old['col']), '_row': int(old['row']),
     })
 
-    # Re-run network pass for the affected subsector
     sub = old['subsector']
     sub_systems = {k: v for k, v in systems.items() if v.get('subsector') == sub}
     sub_systems, _ = run_network_pass(sub_systems)
@@ -340,16 +424,24 @@ def build_parser() -> argparse.ArgumentParser:
     gen = sub.add_parser('generate', help='Generate a new sector/subsector/system')
     gen.add_argument('--scope', required=True,
                      choices=['region', 'sector', 'subsector', 'system'])
+    gen.add_argument('--region-name', required=True, dest='region_name',
+                     help='Human-readable region name; a code is derived automatically '
+                          '(e.g. "Orion Terminus" → ORT)')
+    gen.add_argument('--sector-name', default=None, dest='sector_name',
+                     help='Human-readable sector name (required for sector/subsector/system scopes)')
+    gen.add_argument('--sector-index', type=int, default=1, dest='sector_index',
+                     help='Sector number within its region (default: 1)')
     gen.add_argument('--id', default=None,
-                     help='Canonical ID (required for sector/subsector/system scopes)')
-    gen.add_argument('--region', default=None,
-                     help='2-4 letter region code (used when scope is sector/subsector)')
+                     help='For subsector scope: subsector letter (e.g. A). '
+                          'For system scope: LXXYY (e.g. C0304) or full canonical ID.')
     gen.add_argument('--sectors', type=int, default=4,
                      help='Number of sectors to generate (region scope only)')
     gen.add_argument('--density', default=DEFAULT_DENSITY,
                      choices=['sparse', 'standard', 'dense', 'cluster'])
     gen.add_argument('--phonemes', default=DEFAULT_PHONEMES,
                      help='Phoneme register name (default, angular, liquid, eastern)')
+    gen.add_argument('--input', default=None,
+                     help='Existing TSV to check for code collisions before generating')
     gen.add_argument('--output', default=None, help='TSV output path (default: stdout)')
 
     # ---- build ----
@@ -357,8 +449,15 @@ def build_parser() -> argparse.ArgumentParser:
     bld.add_argument('--input', required=True, help='Existing TSV file')
     bld.add_argument('--scope', required=True,
                      choices=['sector', 'subsector', 'system'])
-    bld.add_argument('--id', required=True)
-    bld.add_argument('--region', default=None)
+    bld.add_argument('--region-name', required=True, dest='region_name',
+                     help='Human-readable region name; code is derived and collision-checked')
+    bld.add_argument('--sector-name', required=True, dest='sector_name',
+                     help='Human-readable sector name; code is derived and collision-checked')
+    bld.add_argument('--sector-index', type=int, default=1, dest='sector_index',
+                     help='Sector number within its region (default: 1)')
+    bld.add_argument('--id', default=None,
+                     help='For subsector scope: subsector letter. '
+                          'For system scope: LXXYY or full canonical ID.')
     bld.add_argument('--density', default=DEFAULT_DENSITY,
                      choices=['sparse', 'standard', 'dense', 'cluster'])
     bld.add_argument('--phonemes', default=DEFAULT_PHONEMES)
@@ -368,9 +467,8 @@ def build_parser() -> argparse.ArgumentParser:
     # ---- reroll ----
     rrl = sub.add_parser('reroll', help='Reroll a single system')
     rrl.add_argument('--input', required=True)
-    rrl.add_argument('--id', required=True, help='Canonical ID of the system to reroll')
-    rrl.add_argument('--reroll-index', type=int, default=1,
-                     dest='reroll_index',
+    rrl.add_argument('--id', required=True, help='Full canonical ID of the system to reroll')
+    rrl.add_argument('--reroll-index', type=int, default=1, dest='reroll_index',
                      help='Integer suffix for the reroll seed (default: 1)')
     rrl.add_argument('--phonemes', default=DEFAULT_PHONEMES)
     rrl.add_argument('--output', default=None)
@@ -380,7 +478,7 @@ def build_parser() -> argparse.ArgumentParser:
     rnd.add_argument('--input', required=True)
     rnd.add_argument('--scope', required=True, choices=['subsector', 'sector', 'region'])
     rnd.add_argument('--id', required=True,
-                     help='Scope ID (e.g. ORT-CAS-01-C for subsector, ORT-CAS-01 for sector)')
+                     help='Scope ID passed to the renderer (e.g. ORT-CAS-01-A for subsector)')
     rnd.add_argument('--output', required=True, help='Output SVG path')
     rnd.add_argument('--show-profile', action='store_true', dest='show_profile')
     rnd.add_argument('--color', action='store_true')
@@ -394,7 +492,6 @@ def build_parser() -> argparse.ArgumentParser:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
-
     dispatch = {
         'generate': cmd_generate,
         'build': cmd_build,
