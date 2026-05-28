@@ -1,4 +1,5 @@
 import csv
+import json
 import sys
 from pathlib import Path
 
@@ -65,6 +66,56 @@ def merge(existing: dict, new_systems: dict) -> dict:
         if sid not in result:
             result[sid] = s
     return result
+
+
+def export_markdown(path: Path, systems: dict) -> None:
+    """Export all systems to a Markdown file with an index and detailed sheets."""
+    from .viewer import translate_system, translate_profile_dict
+    
+    with path.open('w', encoding='utf-8') as f:
+        f.write("# 🌌 Sector Report\n\n")
+        
+        # 1. Summary Index Table
+        f.write("## 📊 System Index\n\n")
+        f.write("| System | Profile | Access | Hazard | Resources | Population | Power | Tension | Distinct | Network |\n")
+        f.write("| :--- | :---: | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n")
+        
+        for sid in sorted(systems.keys()):
+            s = systems[sid]
+            t = translate_profile_dict(s['profile'])
+            if "error" in t: continue
+            
+            # Short versions for the table
+            ac = t['access'].split(' - ')[0].split(' (')[0]
+            hz = t['hazard'].split(' (')[0]
+            rx = t['resources'].split(': ')[0].split(' / ')[0]
+            pp = t['population'].split(' - ')[0]
+            pw = t['power'].split(' - ')[0]
+            tn = t['tension'].split(' - ')[0].split(', ')[0]
+            dx = t['distinctiveness'].split(' - ')[0]
+            net = f"{t['net_importance'].split(' - ')[0]} ({t['net_role'].split(' - ')[0]})" if t['net_importance'] else "-"
+            
+            f.write(f"| **{s['name']}** | `{s['profile']}` | {ac} | {hz} | {rx} | {pp} | {pw} | {tn} | {dx} | {net} |\n")
+            
+        f.write("\n---\n\n## 🪐 System Detail Sheets\n\n")
+        
+        # 2. Detailed Sheets
+        for sid in sorted(systems.keys()):
+            f.write(translate_system(systems[sid]))
+            f.write("\n\n---\n\n")
+
+
+def export_json(path: Path, systems: dict) -> None:
+    """Export all systems to a JSON file."""
+    data = {
+        "metadata": {
+            "system": "Sector Generation System",
+            "count": len(systems)
+        },
+        "systems": [systems[sid] for sid in sorted(systems.keys())]
+    }
+    with path.open('w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2)
 
 
 def get_pending_links(systems: dict) -> list:

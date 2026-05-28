@@ -198,11 +198,13 @@ def render_subsector(systems: dict, region: str, sector_name: str, subsector: st
             if not s:
                 continue
             cx, cy = _hex_center(col, row, size, margin)
+            lines.append(f'<g id="{cid}">')
             lines.append(_svg_circle(cx, cy, dot_r))
             lines.append(_svg_text(cx, cy + profile_y_offset, _display_profile(s['profile']),
                                    font_size=profile_fs))
             lines.append(_svg_text(cx, cy + name_y_offset, s['name'],
                                    font_size=name_fs))
+            lines.append('</g>')
 
     # Subsector label
     lines.append(_svg_text(margin / 2, margin / 2, f"{sector_name}-{subsector}",
@@ -210,6 +212,12 @@ def render_subsector(systems: dict, region: str, sector_name: str, subsector: st
 
     lines.append('</svg>')
     return '\n'.join(lines)
+
+
+def render_subsector_to_svg(systems: dict, scope_id: str) -> str:
+    """Convenience wrapper for GUI and other tools to get SVG string for a subsector."""
+    parts = _parse_scope_id_subsector(scope_id)
+    return render_subsector(systems, parts['region'], parts['sector_name'], parts['subsector'])
 
 
 # ---------------------------------------------------------------------------

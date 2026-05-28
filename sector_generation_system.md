@@ -1,17 +1,14 @@
 # Sector Generation System
+
 ### An agnostic tool for procedural space opera worldbuilding
 
 *Licensed under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0)*
-
----
 
 ## Design philosophy
 
 This system generates interstellar sectors for tabletop roleplaying games. It is setting-agnostic: it assumes faster-than-light travel and inhabited systems, and nothing else. It does not model a specific physics, a specific FTL metaphysics, or a specific political context. The outputs are designed to be encounter-first - every field answers a question a referee or player would actually ask at the table, not a question a simulator would ask.
 
 The full procedure requires only two six-sided dice and a pencil.
-
----
 
 ## The System Encounter Profile (SEP)
 
@@ -22,8 +19,6 @@ Every system in a sector is described by a nine-character string divided into tw
 ```
 
 The first block (seven characters) encodes intrinsic facts about the system. The second block (two characters, separated by a dash) encodes relational facts - the system's position and function within the interstellar network. The dash is load-bearing: it marks the boundary between what a system is and what it means.
-
----
 
 ### Field definitions
 
@@ -130,8 +125,6 @@ The oracle slot. One dominant trait that makes this system memorable, anomalous,
 | R | Restricted - something deliberately hidden or controlled |
 | W | Weird - referee wildcard, defies categorization |
 
----
-
 ### Network fields
 
 **Ni - Network Importance** (ordinal 0-5)
@@ -161,8 +154,6 @@ What function does this system perform in the network?
 | S | Sanctuary - refuge, neutral ground, off the main lines |
 | I | Isolated - effectively disconnected |
 
----
-
 ### Reading a profile string
 
 ```
@@ -176,19 +167,20 @@ A hard-to-reach extraction site with no stable authority, actively contested, co
 ```
 00N0V0- - 0I
 ```
+
 Empty, benign, nothing here, isolated. Don't stop.
 
 ```
 15B5H4R - 5K
 ```
+
 Near-inaccessible, extreme hazard, rich biosphere, billions of inhabitants, hegemonic authority, open warfare, something deliberately hidden. Network-critical chokepoint. A major setting location with every story driver running simultaneously.
 
 ```
 01T3S2- - 3T
 ```
-Easy access, minimal hazard, trade economy, settled population, conventional state, low friction, nothing exceptional. A normal working world on a regional route. The texture of a standard stopover.
 
----
+Easy access, minimal hazard, trade economy, settled population, conventional state, low friction, nothing exceptional. A normal working world on a regional route. The texture of a standard stopover.
 
 ## Sector and subsector cataloging
 
@@ -234,8 +226,6 @@ Spatial relationships between sectors are expressed on the map, not in the code.
 
 **SubsectorLetter** is assigned by position within the sector: A through P in reading order, left to right, top to bottom. A is the top-left subsector, P is the bottom-right. This is fixed by the grid and requires no decision.
 
----
-
 ## Generation procedure
 
 ### Tools required
@@ -243,8 +233,6 @@ Spatial relationships between sectors are expressed on the map, not in the code.
 Two six-sided dice (2d6) and one six-sided die (1d6). The entire procedure uses only these.
 
 When a step calls for 2d6, roll both and add them. When it calls for 1d6, roll one.
-
----
 
 ### Step 0 - System presence
 
@@ -259,8 +247,6 @@ Assign a density class to the sector before rolling any hexes. This is a setting
 
 Roll 1d6 for each hex. Mark present systems on your map. For every hex with a system, proceed through Steps 1 through 8 in order.
 
----
-
 ### Step 1 - Hz (Hazard)
 
 Roll 2d6. No modifiers.
@@ -273,8 +259,6 @@ Roll 2d6. No modifiers.
 | 7-9 | 2 |
 | 10-11 | 1 |
 | 12 | 0 |
-
----
 
 ### Step 2 - Rx (Resource)
 
@@ -293,8 +277,6 @@ Roll 2d6.
 
 **Modifier:** if Hz is 4 or 5, any result of T, I, or B becomes M instead. Hostile environments cannot sustain trade, manufacturing, or agriculture at scale - only extraction.
 
----
-
 ### Step 3 - Pp (Population)
 
 Roll 2d6, then subtract Hz from the result.
@@ -309,8 +291,6 @@ Roll 2d6, then subtract Hz from the result.
 | 12 or more | 5 |
 
 **Hard caps:** if Hz is 5, Pp cannot exceed 1. If Hz is 4, Pp cannot exceed 2. Apply these after the table.
-
----
 
 ### Step 4 - Pw (Power)
 
@@ -364,8 +344,6 @@ Pw is not rolled freely. Pp constrains the available outcomes.
 | 4-5 | H |
 | 6 | E |
 
----
-
 ### Step 5 - Ac (Access)
 
 Roll 2d6. Apply all applicable modifiers, then consult the table.
@@ -391,8 +369,6 @@ Roll 2d6. Apply all applicable modifiers, then consult the table.
 | 6-7 | 3 |
 | 4-5 | 4 |
 | 3 or less | 5 |
-
----
 
 ### Step 6 - Tn (Tension)
 
@@ -420,8 +396,6 @@ Roll 2d6. Apply all applicable modifiers, then consult the table.
 | 10-11 | 4 |
 | 12 or more | 5 |
 
----
-
 ### Step 7 - Dx (Distinctiveness)
 
 Roll 1d6. On a 1 or 2, Dx = dash (nothing exceptional). On 3-6, roll 1d6 again on the sub-table.
@@ -438,8 +412,6 @@ Roll 1d6. On a 1 or 2, Dx = dash (nothing exceptional). On 3-6, roll 1d6 again o
 | 6 | W |
 
 **Special case:** if Rx = X (exotic resource), Dx is automatically determined by rolling 1d6: 1-2 = P, 3-4 = X, 5-6 = H. The exotic resource and the anomaly are the same thing.
-
----
 
 ### Step 8 - Network pass (Ni and Nr)
 
@@ -487,8 +459,6 @@ Count the number of other systems within 2 hexes of this system on the map. Call
 | Connection count 4 or more | H |
 
 Check one final condition across the whole subsector after assigning all other Nr values: any system whose removal would split the subsector's connected systems into two or more disconnected groups is K, regardless of its previously assigned Nr. Check this last.
-
----
 
 ## Route determination
 
@@ -538,8 +508,6 @@ Apply these two passes after classifying all active links.
 
 For each system within reach of the subsector edge, note which edge hexes it reaches into the adjacent subsector. Record these as pending links. They are resolved when the adjacent subsector is generated, using the same procedure. The link score determines the outcome; neither contributor decides unilaterally.
 
----
-
 ## Output format
 
 Each system produces a profile string and a canonical identifier, recorded on one line:
@@ -554,4 +522,6 @@ Draw routes on the map using three distinct line styles - one per tier. The netw
 
 ---
 
-*This document is released under CC BY-SA 4.0. You are free to share and adapt this material for any purpose, including commercial use, provided you give appropriate credit and distribute any adaptations under the same license.*
+(c) 2026 Roberto Bisceglie
+
+*This work is released under CC BY-SA 4.0. You are free to share and adapt this material for any purpose, including commercial use, provided you give appropriate credit and distribute any adaptations under the same license.*

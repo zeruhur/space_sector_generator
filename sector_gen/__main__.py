@@ -9,9 +9,12 @@ from .config import (DEFAULT_DENSITY, DEFAULT_PHONEMES, DEFAULT_SECTOR_NUMBER,
 from .coordinates import (build_canonical_id, derive_code, hexes_for_subsector,
                            parse_canonical_id)
 from .generator import generate_system
-from .io import (confirm_overwrite, load_tsv, merge, save_tsv, write_tsv_stdout)
+from .io import (confirm_overwrite, load_tsv, merge, save_tsv, write_tsv_stdout,
+                   export_markdown, export_json)
 from .names import load_register
 from .network import run_network_pass, resolve_pending_links
+from .viewer import translate_profile_dict, translate_system
+from .gui import run_server
 
 
 # ---------------------------------------------------------------------------
@@ -390,6 +393,71 @@ def cmd_render(args) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Command: view
+# ---------------------------------------------------------------------------
+
+def cmd_view(args) -> None:
+    if args.profile:
+        # For a bare profile, we can wrap it in a dummy system dict
+        dummy = {'name': 'Manual Profile', 'profile': args.profile}
+        print(translate_system(dummy))
+        return
+
+    if not args.input:
+        print("error: either --profile or --input is required for view", file=sys.stderr)
+        sys.exit(1)
+
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"error: input file not found: {input_path}", file=sys.stderr)
+        sys.exit(1)
+
+    systems = load_tsv(input_path)
+    if args.id:
+        if args.id not in systems:
+            print(f"error: system {args.id!r} not found in {input_path}", file=sys.stderr)
+            sys.exit(1)
+        print(translate_system(systems[args.id]))
+    else:
+        # If no ID, print a summary or all? Let's do all with a separator if many.
+        for sid in sorted(systems.keys()):
+            print(translate_system(systems[sid]))
+            print("-" * 40)
+
+
+# ---------------------------------------------------------------------------
+# Command: export
+# ---------------------------------------------------------------------------
+
+def cmd_export(args) -> None:
+    input_path = Path(args.input)
+    if not input_path.exists():
+        print(f"error: input file not found: {input_path}", file=sys.stderr)
+        sys.exit(1)
+
+    systems = load_tsv(input_path)
+    output_path = Path(args.output)
+
+    if args.format == 'markdown':
+        export_markdown(output_path, systems)
+    elif args.format == 'json':
+        export_json(output_path, systems)
+    else:
+        print(f"error: unsupported format: {args.format}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Exported {len(systems)} systems to {output_path} ({args.format})", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Command: gui
+# ---------------------------------------------------------------------------
+
+def cmd_gui(_args) -> None:
+    run_server()
+
+
+# ---------------------------------------------------------------------------
 # Command: test
 # ---------------------------------------------------------------------------
 
@@ -483,6 +551,22 @@ def build_parser() -> argparse.ArgumentParser:
     rnd.add_argument('--show-profile', action='store_true', dest='show_profile')
     rnd.add_argument('--color', action='store_true')
 
+    # ---- view ----
+    vw = sub.add_parser('view', help='Translate system profiles to natural language')
+    vw.add_argument('--profile', help='Directly translate a profile string (e.g. 32M2A3X-4K)')
+    vw.add_argument('--input', help='Input TSV file')
+    vw.add_argument('--id', help='Canonical ID of a system in the TSV to translate')
+
+    # ---- export ----
+    exp = sub.add_parser('export', help='Export systems to other formats')
+    exp.add_argument('--input', required=True, help='Input TSV file')
+    exp.add_argument('--output', required=True, help='Output file path')
+    exp.add_argument('--format', required=True, choices=['markdown', 'json'],
+                     help='Export format (markdown or json)')
+
+    # ---- gui ----
+    sub.add_parser('gui', help='Start the local web GUI')
+
     # ---- test ----
     sub.add_parser('test', help='Run built-in tests')
 
@@ -497,6 +581,9 @@ def main() -> None:
         'build': cmd_build,
         'reroll': cmd_reroll,
         'render': cmd_render,
+        'view': cmd_view,
+        'export': cmd_export,
+        'gui': cmd_gui,
         'test': cmd_test,
     }
     dispatch[args.command](args)
