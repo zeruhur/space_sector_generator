@@ -269,7 +269,14 @@ HTML_TEMPLATE = """
                     <option value="cluster">Cluster</option>
                 </select>
             </div>
-            <button id="generate-btn">Generate Subsector</button>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="overwrite" style="width: auto;">
+                <label for="overwrite" style="color: #94a3b8; cursor: pointer;">Overwrite if exists</label>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button id="view-btn" style="flex: 1; background: #475569; color: white;">View Map</button>
+                <button id="generate-btn" style="flex: 1.5;">Generate</button>
+            </div>
             
             <div class="export-group">
                 <button class="export-btn" id="export-md">Export MD</button>
@@ -335,7 +342,8 @@ HTML_TEMPLATE = """
                 region: document.getElementById('region-name').value,
                 sector: document.getElementById('sector-name').value,
                 subsector: document.getElementById('subsector').value,
-                density: document.getElementById('density').value
+                density: document.getElementById('density').value,
+                overwrite: document.getElementById('overwrite').checked
             };
 
             try {
@@ -359,6 +367,39 @@ HTML_TEMPLATE = """
                 alert('Generation failed.');
             } finally {
                 document.body.classList.remove('loading');
+                status.innerText = 'Ready';
+            }
+        };
+
+        document.getElementById('view-btn').onclick = async () => {
+            status.innerText = 'Recalling subsector...';
+            
+            const payload = {
+                region: document.getElementById('region-name').value,
+                sector: document.getElementById('sector-name').value,
+                subsector: document.getElementById('subsector').value
+            };
+
+            try {
+                const response = await fetch('/api/view', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    mapContainer.innerHTML = data.svg;
+                    scale = 1; translateX = 0; translateY = 0;
+                    updateTransform();
+                    setTimeout(attachClickHandlers, 100);
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Failed to recall subsector.');
+            } finally {
                 status.innerText = 'Ready';
             }
         };
@@ -750,6 +791,8 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
 
         if self.path == '/api/generate':
             self.handle_generate(data)
+        elif self.path == '/api/view':
+            self.handle_view(data)
         elif self.path == '/api/translate':
             self.handle_translate(data)
         elif self.path == '/api/export':
@@ -763,11 +806,18 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         sector_name = data.get('sector', 'Cassian')
         subsector_letter = data.get('subsector', 'A')
         density = data.get('density', 'standard')
+        overwrite = data.get('overwrite', False)
 
         region_code = derive_code(region_name, set())
         sector_code = derive_code(sector_name, set())
         sector_id = f"{sector_code}-01"
         
+        # If overwrite is requested, clear systems in THIS subsector from the global dict
+        if overwrite:
+            subsector_hexes = set(hexes_for_subsector(region_code, sector_code, subsector_letter))
+            current_systems = {sid: s for sid, s in current_systems.items() if sid not in subsector_hexes}
+            print(f"Overwriting subsector {subsector_letter}...")
+
         register = load_register('default')
         
         new_systems = {}
@@ -776,7 +826,7 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             if s:
                 new_systems[cid] = s
         
-        # Additive logic: merge with current workspace (existing wins)
+        # Additive logic: merge with current workspace (existing wins unless we just cleared them)
         from .io import merge
         current_systems = merge(current_systems, new_systems)
         
@@ -787,9 +837,30 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         # Auto-save
         save_workspace()
         
-        # Render ONLY the requested subsector for visual feedback
-        # (Pass full dict so routes cross-subsector are rendered if they exist)
+        # Render subsector
         svg = render_subsector_to_svg(current_systems, f"{region_code}-{sector_id}-{subsector_letter}")
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'svg': svg}).encode('utf-8'))
+
+    def handle_view(self, data):
+        global current_systems
+        region_name = data.get('region', 'Orion')
+        sector_name = data.get('sector', 'Cassian')
+        subsector_letter = data.get('subsector', 'A')
+
+        region_code = derive_code(region_name, set())
+        sector_code = derive_code(sector_name, set())
+        sector_id = f"{sector_code}-01"
+        scope_id = f"{region_code}-{sector_id}-{subsector_letter}"
+        
+        # Ensure we have the latest routes/importance calculated for rendering
+        current_systems, _ = run_network_pass(current_systems)
+        resolve_pending_links(current_systems)
+        
+        svg = render_subsector_to_svg(current_systems, scope_id)
         
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
