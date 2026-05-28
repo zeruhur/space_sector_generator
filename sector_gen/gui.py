@@ -8,7 +8,7 @@ from .config import (DEFAULT_DENSITY, DEFAULT_PHONEMES, DEFAULT_REGION,
 from .coordinates import derive_code, hexes_for_subsector
 from .generator import generate_system
 from .network import run_network_pass, resolve_pending_links
-from .renderer import render_subsector_to_svg
+from .renderer import render_subsector_to_svg, render_sector, render_region
 from .viewer import translate_system_html
 from .names import load_register
 
@@ -248,6 +248,14 @@ HTML_TEMPLATE = """
                 <input type="text" id="sector-name" value="Cassian">
             </div>
             <div class="form-group">
+                <label>Scope</label>
+                <select id="scope">
+                    <option value="subsector">Subsector</option>
+                    <option value="sector">Sector (all 16 subsectors)</option>
+                    <option value="region">Region (multiple sectors)</option>
+                </select>
+            </div>
+            <div class="form-group" id="subsector-group">
                 <label>Subsector</label>
                 <select id="subsector">
                     <option value="A">A</option><option value="B">B</option>
@@ -259,6 +267,10 @@ HTML_TEMPLATE = """
                     <option value="M">M</option><option value="N">N</option>
                     <option value="O">O</option><option value="P">P</option>
                 </select>
+            </div>
+            <div class="form-group" id="sectors-count-group" style="display:none;">
+                <label>Number of Sectors</label>
+                <input type="number" id="sectors-count" value="4" min="1" max="16">
             </div>
             <div class="form-group">
                 <label>Density</label>
@@ -287,10 +299,13 @@ HTML_TEMPLATE = """
                 <button class="export-btn" id="export-svg" style="background: #0ea5e9">Export SVG</button>
                 <button class="export-btn" id="export-png" style="background: #0ea5e9">Export PNG</button>
             </div>
+            <div class="export-group">
+                <button class="export-btn" id="export-pdf-btn" style="background: #16a34a; width: 100%;">Export PDF</button>
+            </div>
         </div>
         <div id="content">
             <div class="card" id="map-card">
-                <h2 style="margin-top:0">Subsector Map</h2>
+                <h2 style="margin-top:0" id="map-title">Subsector Map</h2>
                 <div class="controls">
                     <div class="control-btn" id="zoom-in" title="Zoom In">+</div>
                     <div class="control-btn" id="zoom-out" title="Zoom Out">−</div>
@@ -321,6 +336,15 @@ HTML_TEMPLATE = """
         const detailsText = document.getElementById('details-text');
         const status = document.getElementById('status');
 
+        const MAP_TITLES = { subsector: 'Subsector Map', sector: 'Sector Map', region: 'Region Map' };
+
+        document.getElementById('scope').onchange = function() {
+            const scope = this.value;
+            document.getElementById('subsector-group').style.display = scope === 'subsector' ? 'flex' : 'none';
+            document.getElementById('sectors-count-group').style.display = scope === 'region' ? 'flex' : 'none';
+            document.getElementById('map-title').innerText = MAP_TITLES[scope] || 'Map';
+        };
+
         let scale = 1;
         let translateX = 0;
         let translateY = 0;
@@ -339,9 +363,11 @@ HTML_TEMPLATE = """
             status.innerText = 'Generating...';
             
             const payload = {
+                scope: document.getElementById('scope').value,
                 region: document.getElementById('region-name').value,
                 sector: document.getElementById('sector-name').value,
                 subsector: document.getElementById('subsector').value,
+                sectors: parseInt(document.getElementById('sectors-count').value) || 4,
                 density: document.getElementById('density').value,
                 overwrite: document.getElementById('overwrite').checked
             };
@@ -372,9 +398,11 @@ HTML_TEMPLATE = """
         };
 
         document.getElementById('view-btn').onclick = async () => {
-            status.innerText = 'Recalling subsector...';
+            const scopeVal = document.getElementById('scope').value;
+            status.innerText = `Recalling ${scopeVal}...`;
             
             const payload = {
+                scope: document.getElementById('scope').value,
                 region: document.getElementById('region-name').value,
                 sector: document.getElementById('sector-name').value,
                 subsector: document.getElementById('subsector').value
@@ -404,6 +432,16 @@ HTML_TEMPLATE = """
             }
         };
 
+        function getExportFilename() {
+            const scope = document.getElementById('scope').value;
+            const r = document.getElementById('region-name').value.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase();
+            const s = document.getElementById('sector-name').value.replace(/[^A-Za-z]/g, '').substring(0, 3).toUpperCase();
+            const sub = document.getElementById('subsector').value;
+            if (scope === 'sector') return `${r}-${s}`;
+            if (scope === 'region') return r;
+            return `${r}-${s}-${sub}`;
+        }
+
         // Export handlers
         document.getElementById('export-md').onclick = () => downloadExport('markdown');
         document.getElementById('export-json').onclick = () => downloadExport('json');
@@ -413,7 +451,6 @@ HTML_TEMPLATE = """
             const svg = mapContainer.querySelector('svg');
             if (!svg) { alert('No map generated yet.'); return; }
             
-            // Clone to remove interactive styles for a clean export
             const clone = svg.cloneNode(true);
             clone.style.transform = '';
             
@@ -422,7 +459,7 @@ HTML_TEMPLATE = """
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'sector_map.svg';
+            a.download = `${getExportFilename()}.svg`;
             a.click();
             window.URL.revokeObjectURL(url);
         };
@@ -433,7 +470,6 @@ HTML_TEMPLATE = """
             
             status.innerText = 'Rendering High-Res PNG...';
             
-            // Upscale factor for high-resolution (3x original)
             const resScale = 3;
             const originalWidth = svg.width.baseVal.value;
             const originalHeight = svg.height.baseVal.value;
@@ -453,7 +489,6 @@ HTML_TEMPLATE = """
             canvas.height = originalHeight * resScale;
             
             img.onload = () => {
-                // Clear with white background
                 ctx.fillStyle = "white";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(img, 0, 0);
@@ -462,7 +497,7 @@ HTML_TEMPLATE = """
                     const pngUrl = canvas.toDataURL("image/png");
                     const a = document.createElement('a');
                     a.href = pngUrl;
-                    a.download = 'sector_map_highres.png';
+                    a.download = `${getExportFilename()}.png`;
                     a.click();
                 } catch (err) {
                     console.error(err);
@@ -500,7 +535,7 @@ HTML_TEMPLATE = """
                 const a = document.createElement('a');
                 a.href = url;
                 const ext = format === 'markdown' ? 'md' : format;
-                a.download = `sector_export.${ext}`;
+                a.download = `${getExportFilename()}.${ext}`;
                 document.body.appendChild(a);
                 a.click();
                 window.URL.revokeObjectURL(url);
@@ -542,6 +577,38 @@ HTML_TEMPLATE = """
 
         window.onmouseup = () => isDragging = false;
 
+        document.getElementById('export-pdf-btn').onclick = async () => {
+            status.innerText = 'Building PDF...';
+            try {
+                const response = await fetch('/api/pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scope: document.getElementById('scope').value,
+                        region: document.getElementById('region-name').value,
+                        sector: document.getElementById('sector-name').value,
+                        subsector: document.getElementById('subsector').value
+                    })
+                });
+                if (!response.ok) {
+                    alert('PDF export failed: ' + response.statusText);
+                    return;
+                }
+                const html = await response.text();
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const win = window.open(url, '_blank');
+                // Revoke after the tab has had time to load
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                if (!win) alert('Allow pop-ups for this site to open the PDF preview.');
+            } catch (err) {
+                console.error(err);
+                alert('PDF export failed: ' + err.message);
+            } finally {
+                status.innerText = 'Ready';
+            }
+        };
+
         function attachClickHandlers() {
             const systems = document.querySelectorAll('g[id]');
             systems.forEach(s => {
@@ -574,6 +641,46 @@ HTML_TEMPLATE = """
 </body>
 </html>
 """
+
+def _gen_sector(region_code, sector_code, sector_id, density, register):
+    """Generate all 16 subsectors for one sector, network-passing each subsector."""
+    from .io import merge as io_merge
+    new_systems = {}
+    for sub in SUBSECTOR_LETTERS:
+        sub_new = {}
+        for cid in hexes_for_subsector(region_code, sector_code, sub):
+            s = generate_system(cid, sector_id, density=density, register=register)
+            if s:
+                sub_new[cid] = s
+        run_network_pass(sub_new)
+        new_systems.update(sub_new)
+    return new_systems
+
+
+def _gen_region(region_code, n_sectors, density, register):
+    """Generate n_sectors auto-named sectors for a region. Returns (systems, sectors_list)."""
+    new_systems = {}
+    sectors_list = []
+    used_codes = set()
+    for i in range(n_sectors):
+        auto_name = f"Sector{i + 1:02d}"
+        try:
+            sc = derive_code(auto_name, used_codes)
+            if len(sc) > 4:  # canonical ID requires 2–4 alpha chars
+                raise ValueError("code too long")
+        except ValueError:
+            # SA, SB, SC, ... — all-alpha, 2 chars, guaranteed unique for ≤16 sectors
+            sc = next(
+                f"S{chr(ord('A') + j)}"
+                for j in range(26)
+                if f"S{chr(ord('A') + j)}" not in used_codes
+            )
+        used_codes.add(sc)
+        sec_id = f"{sc}-01"
+        new_systems.update(_gen_sector(region_code, sc, sec_id, density, register))
+        sectors_list.append((region_code, sc))
+    return new_systems, sectors_list
+
 
 # Global storage for current session
 WORKSPACE_PATH = Path("workspace.tsv")
@@ -797,71 +904,114 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             self.handle_translate(data)
         elif self.path == '/api/export':
             self.handle_export(data)
+        elif self.path == '/api/pdf':
+            self.handle_pdf(data)
         else:
             self.send_error(404)
 
-    def handle_generate(self, data):
-        global current_systems
+    def _parse_scope(self, data):
+        """Derive region_code, sector_code, sector_id, subsector_letter from request data."""
         region_name = data.get('region', 'Orion')
         sector_name = data.get('sector', 'Cassian')
         subsector_letter = data.get('subsector', 'A')
-        density = data.get('density', 'standard')
-        overwrite = data.get('overwrite', False)
-
         region_code = derive_code(region_name, set())
         sector_code = derive_code(sector_name, set())
         sector_id = f"{sector_code}-01"
-        
-        # If overwrite is requested, clear systems in THIS subsector from the global dict
-        if overwrite:
-            subsector_hexes = set(hexes_for_subsector(region_code, sector_code, subsector_letter))
-            current_systems = {sid: s for sid, s in current_systems.items() if sid not in subsector_hexes}
-            print(f"Overwriting subsector {subsector_letter}...")
+        return region_code, sector_code, sector_id, subsector_letter
 
+    def handle_generate(self, data):
+        global current_systems
+        density = data.get('density', 'standard')
+        overwrite = data.get('overwrite', False)
+        scope = data.get('scope', 'subsector')
+
+        region_code, sector_code, sector_id, subsector_letter = self._parse_scope(data)
         register = load_register('default')
-        
-        new_systems = {}
-        for cid in hexes_for_subsector(region_code, sector_code, subsector_letter):
-            s = generate_system(cid, sector_id, density=density, register=register)
-            if s:
-                new_systems[cid] = s
-        
-        # Additive logic: merge with current workspace (existing wins unless we just cleared them)
+
         from .io import merge
-        current_systems = merge(current_systems, new_systems)
-        
-        # Run network pass and resolve links across the WHOLE workspace
-        current_systems, _ = run_network_pass(current_systems)
-        resolve_pending_links(current_systems)
-        
-        # Auto-save
-        save_workspace()
-        
-        # Render subsector
-        svg = render_subsector_to_svg(current_systems, f"{region_code}-{sector_id}-{subsector_letter}")
-        
+
+        if scope == 'subsector':
+            if overwrite:
+                subsector_hexes = set(hexes_for_subsector(region_code, sector_code, subsector_letter))
+                current_systems = {sid: s for sid, s in current_systems.items() if sid not in subsector_hexes}
+                print(f"Overwriting subsector {subsector_letter}...")
+
+            new_systems = {}
+            for cid in hexes_for_subsector(region_code, sector_code, subsector_letter):
+                s = generate_system(cid, sector_id, density=density, register=register)
+                if s:
+                    new_systems[cid] = s
+
+            current_systems = merge(current_systems, new_systems)
+
+            sub_systems = {
+                sid: s for sid, s in current_systems.items()
+                if s.get('region') == region_code
+                and s.get('sector') == sector_id
+                and s.get('subsector') == subsector_letter
+            }
+            run_network_pass(sub_systems)
+            resolve_pending_links(current_systems)
+            save_workspace()
+
+            svg = render_subsector_to_svg(current_systems, f"{region_code}-{sector_id}-{subsector_letter}")
+
+        elif scope == 'sector':
+            if overwrite:
+                current_systems = {sid: s for sid, s in current_systems.items()
+                                   if not (s.get('region') == region_code and s.get('sector') == sector_id)}
+                print(f"Overwriting sector {sector_id}...")
+
+            new_systems = _gen_sector(region_code, sector_code, sector_id, density, register)
+            current_systems = merge(current_systems, new_systems)
+            resolve_pending_links(current_systems)
+            save_workspace()
+
+            svg = render_sector(current_systems, region_code, sector_code)
+
+        elif scope == 'region':
+            n_sectors = max(1, int(data.get('sectors', 4)))
+            if overwrite:
+                current_systems = {sid: s for sid, s in current_systems.items()
+                                   if s.get('region') != region_code}
+                print(f"Overwriting region {region_code}...")
+
+            new_systems, sectors_list = _gen_region(region_code, n_sectors, density, register)
+            current_systems = merge(current_systems, new_systems)
+            resolve_pending_links(current_systems)
+            save_workspace()
+
+            svg = render_region(current_systems, sectors_list)
+
+        else:
+            self.send_error(400, f"Unknown scope: {scope!r}")
+            return
+
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps({'svg': svg}).encode('utf-8'))
 
     def handle_view(self, data):
-        global current_systems
-        region_name = data.get('region', 'Orion')
-        sector_name = data.get('sector', 'Cassian')
-        subsector_letter = data.get('subsector', 'A')
+        region_code, sector_code, sector_id, subsector_letter = self._parse_scope(data)
+        scope = data.get('scope', 'subsector')
 
-        region_code = derive_code(region_name, set())
-        sector_code = derive_code(sector_name, set())
-        sector_id = f"{sector_code}-01"
-        scope_id = f"{region_code}-{sector_id}-{subsector_letter}"
-        
-        # Ensure we have the latest routes/importance calculated for rendering
-        current_systems, _ = run_network_pass(current_systems)
-        resolve_pending_links(current_systems)
-        
-        svg = render_subsector_to_svg(current_systems, scope_id)
-        
+        if scope == 'subsector':
+            scope_id = f"{region_code}-{sector_id}-{subsector_letter}"
+            svg = render_subsector_to_svg(current_systems, scope_id)
+        elif scope == 'sector':
+            svg = render_sector(current_systems, region_code, sector_code)
+        elif scope == 'region':
+            sectors_list = sorted(set(
+                (s.get('region'), s.get('sector', '').split('-')[0])
+                for s in current_systems.values()
+                if s.get('region') == region_code and s.get('sector')
+            ), key=lambda x: x[1])
+            svg = render_region(current_systems, sectors_list) if sectors_list else '<svg/>'
+        else:
+            self.send_error(400, f"Unknown scope: {scope!r}")
+            return
+
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
@@ -918,6 +1068,144 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         finally:
             if tmp_path.exists():
                 tmp_path.unlink()
+
+    def handle_pdf(self, data):
+        if not current_systems:
+            self.send_error(400, "No data to export")
+            return
+
+        import re
+        from .renderer import render_subsector as _render_sub
+        from .viewer import translate_profile_dict, translate_system_html
+
+        scope = data.get('scope', 'subsector')
+        region_code, sector_code, sector_id, subsector_letter = self._parse_scope(data)
+
+        # Collect (region, sector_code, sector_id, subsector) tuples for every subsector in scope
+        if scope == 'subsector':
+            entries = [(region_code, sector_code, sector_id, subsector_letter)]
+        elif scope == 'sector':
+            entries = [(region_code, sector_code, sector_id, sub) for sub in SUBSECTOR_LETTERS]
+        else:  # region
+            seen = {}
+            for s in current_systems.values():
+                r = s.get('region', '')
+                if r != region_code:
+                    continue
+                sec = s.get('sector', '')
+                sub = s.get('subsector', '')
+                if sec and sub:
+                    seen[(r, sec.split('-')[0], sec, sub)] = True
+            entries = sorted(seen.keys(), key=lambda x: (x[2], x[3]))
+
+        def _svg_responsive(svg):
+            m = re.search(r'width="([\d.]+)"[^>]*height="([\d.]+)"', svg)
+            if not m:
+                return svg
+            w, h = m.group(1), m.group(2)
+            return re.sub(
+                r'width="[\d.]+"([^>]*)height="[\d.]+"',
+                f'viewBox="0 0 {w} {h}" width="100%" height="auto"\\1',
+                svg, count=1
+            )
+
+        sections = []
+        for i, (r, sc, sec, sub) in enumerate(entries):
+            sub_systems = {
+                sid: s for sid, s in current_systems.items()
+                if s.get('region') == r and s.get('sector') == sec and s.get('subsector') == sub
+            }
+            if not sub_systems:
+                continue
+
+            heading = f"Region: {r} / Sector: {sec} / Subsector: {sub}"
+            svg = _svg_responsive(_render_sub(current_systems, r, sc, sub))
+
+            # Index table rows
+            rows = []
+            for sid in sorted(sub_systems.keys()):
+                s = sub_systems[sid]
+                t = translate_profile_dict(s['profile'])
+                if 'error' in t:
+                    continue
+                ac = t['access'].split(' - ')[0].split(' (')[0]
+                hz = t['hazard'].split(' (')[0]
+                rx = t['resources'].split(': ')[0].split(' / ')[0]
+                pp = t['population'].split(' - ')[0]
+                pw = t['power'].split(' - ')[0]
+                tn = t['tension'].split(' - ')[0].split(', ')[0]
+                dx = t['distinctiveness'].split(' - ')[0]
+                net = (f"{t['net_importance'].split(' - ')[0]} ({t['net_role'].split(' - ')[0]})"
+                       if t['net_importance'] else '—')
+                rows.append(
+                    f'<tr><td><b>{s["name"]}</b></td><td><code>{s["profile"]}</code></td>'
+                    f'<td>{ac}</td><td>{hz}</td><td>{rx}</td><td>{pp}</td>'
+                    f'<td>{pw}</td><td>{tn}</td><td>{dx}</td><td>{net}</td></tr>'
+                )
+            table = (
+                '<table class="idx"><thead><tr>'
+                '<th>System</th><th>Profile</th><th>Access</th><th>Hazard</th>'
+                '<th>Resources</th><th>Population</th><th>Power</th>'
+                '<th>Tension</th><th>Distinct</th><th>Network</th>'
+                '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
+            )
+
+            # Detail sheets
+            sheets = [
+                f'<div class="sheet">{translate_system_html(sub_systems[sid])}</div>'
+                for sid in sorted(sub_systems.keys())
+            ]
+            details = '<hr class="sep">'.join(sheets)
+
+            pb = '<div class="pgbrk"></div>' if i > 0 else ''
+            sections.append(f'''{pb}<section>
+<h1>{heading}</h1>
+<div class="mapwrap">{svg}</div>
+<div class="pgbrk"></div>
+<h2>System Index</h2>
+{table}
+<h2>System Detail Sheets</h2>
+{details}
+</section>''')
+
+        html = f'''<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Sector Export — {region_code}</title>
+<style>
+body{{font-family:Georgia,serif;margin:2cm;color:#000;font-size:10pt;}}
+h1{{font-size:16pt;border-bottom:2px solid #000;padding-bottom:4pt;margin:0 0 12pt;}}
+h2{{font-size:13pt;border-bottom:1px solid #666;margin:16pt 0 8pt;}}
+h3{{font-size:11pt;margin:10pt 0 4pt;}}
+h4{{font-size:10pt;color:#333;margin:8pt 0 3pt;}}
+code{{font-family:monospace;background:#f0f0f0;padding:1pt 3pt;}}
+.mapwrap{{text-align:center;margin:8pt 0 0;}}
+.mapwrap svg{{max-height:480pt;width:90%;display:block;margin:auto;}}
+table.idx{{border-collapse:collapse;width:100%;font-size:7.5pt;margin:6pt 0;}}
+table.idx th{{background:#222;color:#fff;padding:3pt 5pt;text-align:left;}}
+table.idx td{{border:1px solid #ccc;padding:2pt 4pt;}}
+table.idx tr:nth-child(even) td{{background:#f8f8f8;}}
+.sheet{{margin:8pt 0;}}
+hr.sep{{border:none;border-top:1px solid #ddd;margin:10pt 0;}}
+ul{{margin:2pt 0 6pt 18pt;}}
+li{{margin-bottom:2pt;}}
+.pgbrk{{page-break-before:always;}}
+@media print{{
+  .pgbrk{{page-break-before:always;}}
+  h1,h2{{break-after:avoid;}}
+  .mapwrap{{break-inside:avoid;}}
+}}
+</style>
+</head><body>
+{''.join(sections)}
+<script>window.onload=function(){{window.print();}}</script>
+</body></html>'''
+
+        content = html.encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Content-Length', str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
 def run_server():
     load_workspace()
