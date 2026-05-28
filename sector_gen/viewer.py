@@ -115,10 +115,13 @@ def translate_system_html(system: dict) -> str:
     if "error" in t:
         return f"<p class='error'>Error: {t['error']}</p>"
 
+    sys_id = system.get('id', '')
     html = f"<h3>🗺️ {system.get('name', 'Unknown')} (<code>{system.get('profile', '????')}</code>)</h3>"
-    
+
     html += "<h4>📌 Intrinsic Characteristics</h4>"
     html += "<ul>"
+    if sys_id:
+        html += f"<li><b>Coordinates:</b> <code>{sys_id}</code></li>"
     html += f"<li><b>Access (Ac):</b> {t['access']}</li>"
     html += f"<li><b>Hazard (Hz):</b> {t['hazard']}</li>"
     html += f"<li><b>Resources (Rx):</b> {t['resources']}</li>"
@@ -150,10 +153,13 @@ def translate_system(system: dict) -> str:
     if "error" in t:
         return f"Error: {t['error']}"
 
+    sys_id = system.get('id', '')
     lines = []
     lines.append(f"### 🗺️ {system.get('name', 'Unknown')} (`{system.get('profile', '????')}`)")
     lines.append("")
     lines.append("#### 📌 Intrinsic Characteristics")
+    if sys_id:
+        lines.append(f"- **Coordinates:** `{sys_id}`")
     lines.append(f"- **Access (Ac):** {t['access']}")
     lines.append(f"- **Hazard (Hz):** {t['hazard']}")
     lines.append(f"- **Resources (Rx):** {t['resources']}")

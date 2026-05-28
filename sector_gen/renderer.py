@@ -207,7 +207,7 @@ def render_subsector(systems: dict, region: str, sector_name: str, subsector: st
             lines.append('</g>')
 
     # Subsector label
-    lines.append(_svg_text(margin / 2, margin / 2, f"{sector_name}-{subsector}",
+    lines.append(_svg_text(margin / 2, margin / 2, f"{region}-{sector_name}-{subsector}",
                            font_size=10, anchor='start'))
 
     lines.append('</svg>')
@@ -223,6 +223,23 @@ def render_subsector_to_svg(systems: dict, scope_id: str) -> str:
 # ---------------------------------------------------------------------------
 # Render a sector (4×4 subsectors)
 # ---------------------------------------------------------------------------
+
+def _sector_abs_pos(sid: str, sub_size: float, sub_w: float, sub_h: float,
+                    sub_margin: float):
+    """Return absolute (x, y) pixel position of a system within the sector SVG."""
+    try:
+        parts = parse_canonical_id(sid)
+    except (KeyError, ValueError, IndexError):
+        return None
+    try:
+        sub_idx = SUBSECTOR_LETTERS.index(parts['subsector'])
+    except ValueError:
+        return None
+    ox = (sub_idx % SECTOR_SUBSECTORS_WIDE) * sub_w
+    oy = (sub_idx // SECTOR_SUBSECTORS_WIDE) * sub_h
+    cx, cy = _hex_center(parts['col'], parts['row'], sub_size, sub_margin)
+    return ox + cx, oy + cy
+
 
 def render_sector(systems: dict, region: str, sector_name: str,
                   sub_size: float = 14.0, show_profile: bool = False,
@@ -257,6 +274,50 @@ def render_sector(systems: dict, region: str, sector_name: str,
             f'<rect x="{ox:.0f}" y="{oy:.0f}" width="{sub_w:.0f}" height="{sub_h:.0f}" '
             f'fill="none" stroke="#000" stroke-width="1"/>'
         )
+
+    # Cross-subsector routes drawn on top of all subsector layers
+    _xsub_tier = {
+        'Primary':   (3.0, '#000', ''),
+        'Secondary': (1.5, '#222', ''),
+        'Tertiary':  (0.75, '#999', '6,3'),
+    }
+    seen_xroutes: set = set()
+    for sid, s in systems.items():
+        try:
+            sp = parse_canonical_id(sid)
+        except (KeyError, ValueError, IndexError):
+            continue
+        if sp['region'] != region or sp['sector_name'] != sector_name:
+            continue
+        for tag in s.get('notes', '').split(';'):
+            tag = tag.strip()
+            if not tag.startswith('route:'):
+                continue
+            rparts = tag.split(':')
+            if len(rparts) < 3:
+                continue
+            target_id, tier = rparts[1], rparts[2]
+            if target_id not in systems:
+                continue
+            try:
+                tp = parse_canonical_id(target_id)
+            except (KeyError, ValueError, IndexError):
+                continue
+            if tp['subsector'] == sp['subsector']:
+                continue  # intra-subsector, already drawn inside each subsector
+            if tp['region'] != region or tp['sector_name'] != sector_name:
+                continue  # cross-sector routes not generated
+            key = tuple(sorted([sid, target_id]))
+            if key in seen_xroutes:
+                continue
+            seen_xroutes.add(key)
+            pos1 = _sector_abs_pos(sid, sub_size, sub_w, sub_h, sub_margin)
+            pos2 = _sector_abs_pos(target_id, sub_size, sub_w, sub_h, sub_margin)
+            if not pos1 or not pos2:
+                continue
+            sw, stroke, dash = _xsub_tier.get(tier, (0.5, '#aaa', ''))
+            lines.append(_svg_line(pos1[0], pos1[1], pos2[0], pos2[1],
+                                   stroke=stroke, stroke_width=sw, dash=dash))
 
     lines.append('</svg>')
     return '\n'.join(lines)

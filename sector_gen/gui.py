@@ -243,7 +243,7 @@ HTML_TEMPLATE = """
                 <label>Region Name</label>
                 <input type="text" id="region-name" value="Orion">
             </div>
-            <div class="form-group">
+            <div class="form-group" id="sector-name-group">
                 <label>Sector Name</label>
                 <input type="text" id="sector-name" value="Cassian">
             </div>
@@ -342,6 +342,7 @@ HTML_TEMPLATE = """
             const scope = this.value;
             document.getElementById('subsector-group').style.display = scope === 'subsector' ? 'flex' : 'none';
             document.getElementById('sectors-count-group').style.display = scope === 'region' ? 'flex' : 'none';
+            document.getElementById('sector-name-group').style.display = scope === 'region' ? 'none' : 'flex';
             document.getElementById('map-title').innerText = MAP_TITLES[scope] || 'Map';
         };
 
@@ -1074,133 +1075,29 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(400, "No data to export")
             return
 
-        import re
-        from .renderer import render_subsector as _render_sub
-        from .viewer import translate_profile_dict, translate_system_html
+        from .io import build_print_html
 
         scope = data.get('scope', 'subsector')
         region_code, sector_code, sector_id, subsector_letter = self._parse_scope(data)
 
-        # Collect (region, sector_code, sector_id, subsector) tuples for every subsector in scope
         if scope == 'subsector':
-            entries = [(region_code, sector_code, sector_id, subsector_letter)]
+            filtered = {sid: s for sid, s in current_systems.items()
+                        if s.get('region') == region_code
+                        and s.get('sector') == sector_id
+                        and s.get('subsector') == subsector_letter}
         elif scope == 'sector':
-            entries = [(region_code, sector_code, sector_id, sub) for sub in SUBSECTOR_LETTERS]
-        else:  # region
-            seen = {}
-            for s in current_systems.values():
-                r = s.get('region', '')
-                if r != region_code:
-                    continue
-                sec = s.get('sector', '')
-                sub = s.get('subsector', '')
-                if sec and sub:
-                    seen[(r, sec.split('-')[0], sec, sub)] = True
-            entries = sorted(seen.keys(), key=lambda x: (x[2], x[3]))
+            filtered = {sid: s for sid, s in current_systems.items()
+                        if s.get('region') == region_code
+                        and s.get('sector') == sector_id}
+        else:
+            filtered = {sid: s for sid, s in current_systems.items()
+                        if s.get('region') == region_code}
 
-        def _svg_responsive(svg):
-            m = re.search(r'width="([\d.]+)"[^>]*height="([\d.]+)"', svg)
-            if not m:
-                return svg
-            w, h = m.group(1), m.group(2)
-            return re.sub(
-                r'width="[\d.]+"([^>]*)height="[\d.]+"',
-                f'viewBox="0 0 {w} {h}" width="100%" height="auto"\\1',
-                svg, count=1
-            )
+        if not filtered:
+            self.send_error(400, "No systems in scope")
+            return
 
-        sections = []
-        for i, (r, sc, sec, sub) in enumerate(entries):
-            sub_systems = {
-                sid: s for sid, s in current_systems.items()
-                if s.get('region') == r and s.get('sector') == sec and s.get('subsector') == sub
-            }
-            if not sub_systems:
-                continue
-
-            heading = f"Region: {r} / Sector: {sec} / Subsector: {sub}"
-            svg = _svg_responsive(_render_sub(current_systems, r, sc, sub))
-
-            # Index table rows
-            rows = []
-            for sid in sorted(sub_systems.keys()):
-                s = sub_systems[sid]
-                t = translate_profile_dict(s['profile'])
-                if 'error' in t:
-                    continue
-                ac = t['access'].split(' - ')[0].split(' (')[0]
-                hz = t['hazard'].split(' (')[0]
-                rx = t['resources'].split(': ')[0].split(' / ')[0]
-                pp = t['population'].split(' - ')[0]
-                pw = t['power'].split(' - ')[0]
-                tn = t['tension'].split(' - ')[0].split(', ')[0]
-                dx = t['distinctiveness'].split(' - ')[0]
-                net = (f"{t['net_importance'].split(' - ')[0]} ({t['net_role'].split(' - ')[0]})"
-                       if t['net_importance'] else '—')
-                rows.append(
-                    f'<tr><td><b>{s["name"]}</b></td><td><code>{s["profile"]}</code></td>'
-                    f'<td>{ac}</td><td>{hz}</td><td>{rx}</td><td>{pp}</td>'
-                    f'<td>{pw}</td><td>{tn}</td><td>{dx}</td><td>{net}</td></tr>'
-                )
-            table = (
-                '<table class="idx"><thead><tr>'
-                '<th>System</th><th>Profile</th><th>Access</th><th>Hazard</th>'
-                '<th>Resources</th><th>Population</th><th>Power</th>'
-                '<th>Tension</th><th>Distinct</th><th>Network</th>'
-                '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
-            )
-
-            # Detail sheets
-            sheets = [
-                f'<div class="sheet">{translate_system_html(sub_systems[sid])}</div>'
-                for sid in sorted(sub_systems.keys())
-            ]
-            details = '<hr class="sep">'.join(sheets)
-
-            pb = '<div class="pgbrk"></div>' if i > 0 else ''
-            sections.append(f'''{pb}<section>
-<h1>{heading}</h1>
-<div class="mapwrap">{svg}</div>
-<div class="pgbrk"></div>
-<h2>System Index</h2>
-{table}
-<h2>System Detail Sheets</h2>
-{details}
-</section>''')
-
-        html = f'''<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
-<title>Sector Export — {region_code}</title>
-<style>
-body{{font-family:Georgia,serif;margin:2cm;color:#000;font-size:10pt;}}
-h1{{font-size:16pt;border-bottom:2px solid #000;padding-bottom:4pt;margin:0 0 12pt;}}
-h2{{font-size:13pt;border-bottom:1px solid #666;margin:16pt 0 8pt;}}
-h3{{font-size:11pt;margin:10pt 0 4pt;}}
-h4{{font-size:10pt;color:#333;margin:8pt 0 3pt;}}
-code{{font-family:monospace;background:#f0f0f0;padding:1pt 3pt;}}
-.mapwrap{{text-align:center;margin:8pt 0 0;}}
-.mapwrap svg{{max-height:480pt;width:90%;display:block;margin:auto;}}
-table.idx{{border-collapse:collapse;width:100%;font-size:7.5pt;margin:6pt 0;}}
-table.idx th{{background:#222;color:#fff;padding:3pt 5pt;text-align:left;}}
-table.idx td{{border:1px solid #ccc;padding:2pt 4pt;}}
-table.idx tr:nth-child(even) td{{background:#f8f8f8;}}
-.sheet{{margin:8pt 0;}}
-hr.sep{{border:none;border-top:1px solid #ddd;margin:10pt 0;}}
-ul{{margin:2pt 0 6pt 18pt;}}
-li{{margin-bottom:2pt;}}
-.pgbrk{{page-break-before:always;}}
-@media print{{
-  .pgbrk{{page-break-before:always;}}
-  h1,h2{{break-after:avoid;}}
-  .mapwrap{{break-inside:avoid;}}
-}}
-</style>
-</head><body>
-{''.join(sections)}
-<script>window.onload=function(){{window.print();}}</script>
-</body></html>'''
-
-        content = html.encode('utf-8')
+        content = build_print_html(filtered).encode('utf-8')
         self.send_response(200)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Content-Length', str(len(content)))

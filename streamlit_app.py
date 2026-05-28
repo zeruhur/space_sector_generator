@@ -28,13 +28,8 @@ from sector_gen.gui import _gen_sector, _gen_region
 from sector_gen.io import load_tsv, merge, export_markdown, export_json, save_tsv
 from sector_gen.names import load_register
 from sector_gen.network import run_network_pass, resolve_pending_links
-from sector_gen.renderer import (
-    render_subsector_to_svg,
-    render_sector,
-    render_region,
-    render_subsector as _render_sub,
-)
-from sector_gen.viewer import translate_system, translate_profile_dict, translate_system_html
+from sector_gen.renderer import render_subsector_to_svg, render_sector, render_region
+from sector_gen.viewer import translate_system
 
 
 # ---------------------------------------------------------------------------
@@ -190,103 +185,10 @@ def svg_responsive(svg: str) -> str:
     )
 
 
-def build_pdf_html(systems: dict, scope: str, rc: str, sc: str, sid: str, sub: str) -> str:
-    """Print-ready HTML mirroring handle_pdf in gui.py."""
-    if scope == "Subsector":
-        entries = [(rc, sc, sid, sub)]
-    elif scope == "Sector":
-        entries = [(rc, sc, sid, s) for s in SUBSECTOR_LETTERS]
-    else:
-        seen = {}
-        for s in systems.values():
-            r = s.get("region", "")
-            if r != rc:
-                continue
-            sec = s.get("sector", "")
-            su = s.get("subsector", "")
-            if sec and su:
-                seen[(r, sec.split("-")[0], sec, su)] = True
-        entries = sorted(seen.keys(), key=lambda x: (x[2], x[3]))
-
-    sections = []
-    for i, (r, scode, sec, su) in enumerate(entries):
-        sub_sys = {k: v for k, v in systems.items()
-                   if v.get("region") == r and v.get("sector") == sec
-                   and v.get("subsector") == su}
-        if not sub_sys:
-            continue
-
-        heading = f"Region: {r} / Sector: {sec} / Subsector: {su}"
-        rsvg = svg_responsive(_render_sub(systems, r, scode, su))
-
-        rows = []
-        for k in sorted(sub_sys.keys()):
-            s = sub_sys[k]
-            t = translate_profile_dict(s["profile"])
-            if "error" in t:
-                continue
-            ac = t["access"].split(" - ")[0].split(" (")[0]
-            hz = t["hazard"].split(" (")[0]
-            rx = t["resources"].split(": ")[0].split(" / ")[0]
-            pp = t["population"].split(" - ")[0]
-            pw = t["power"].split(" - ")[0]
-            tn = t["tension"].split(" - ")[0].split(", ")[0]
-            dx = t["distinctiveness"].split(" - ")[0]
-            net = (f"{t['net_importance'].split(' - ')[0]} ({t['net_role'].split(' - ')[0]})"
-                   if t["net_importance"] else "—")
-            rows.append(
-                f'<tr><td><b>{s["name"]}</b></td><td><code>{s["profile"]}</code></td>'
-                f"<td>{ac}</td><td>{hz}</td><td>{rx}</td><td>{pp}</td>"
-                f"<td>{pw}</td><td>{tn}</td><td>{dx}</td><td>{net}</td></tr>"
-            )
-        table = (
-            '<table class="idx"><thead><tr>'
-            "<th>System</th><th>Profile</th><th>Access</th><th>Hazard</th>"
-            "<th>Resources</th><th>Population</th><th>Power</th>"
-            "<th>Tension</th><th>Distinct</th><th>Network</th>"
-            "</tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
-        )
-        sheets = [
-            f'<div class="sheet">{translate_system_html(sub_sys[k])}</div>'
-            for k in sorted(sub_sys.keys())
-        ]
-        pb = '<div class="pgbrk"></div>' if i > 0 else ""
-        sections.append(f"""{pb}<section>
-<h1>{heading}</h1>
-<div class="mapwrap">{rsvg}</div>
-<div class="pgbrk"></div>
-<h2>System Index</h2>
-{table}
-<h2>System Detail Sheets</h2>
-{'<hr class="sep">'.join(sheets)}
-</section>""")
-
-    return f"""<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
-<title>Sector Export — {rc}</title>
-<style>
-body{{font-family:Georgia,serif;margin:2cm;color:#000;font-size:10pt;}}
-h1{{font-size:16pt;border-bottom:2px solid #000;padding-bottom:4pt;margin:0 0 12pt;}}
-h2{{font-size:13pt;border-bottom:1px solid #666;margin:16pt 0 8pt;}}
-h3{{font-size:11pt;margin:10pt 0 4pt;}}
-h4{{font-size:10pt;color:#333;margin:8pt 0 3pt;}}
-code{{font-family:monospace;background:#f0f0f0;padding:1pt 3pt;}}
-.mapwrap{{text-align:center;margin:8pt 0 0;}}
-.mapwrap svg{{max-height:480pt;width:90%;display:block;margin:auto;}}
-table.idx{{border-collapse:collapse;width:100%;font-size:7.5pt;margin:6pt 0;}}
-table.idx th{{background:#222;color:#fff;padding:3pt 5pt;text-align:left;}}
-table.idx td{{border:1px solid #ccc;padding:2pt 4pt;}}
-table.idx tr:nth-child(even) td{{background:#f8f8f8;}}
-.sheet{{margin:8pt 0;}}
-hr.sep{{border:none;border-top:1px solid #ddd;margin:10pt 0;}}
-ul{{margin:2pt 0 6pt 18pt;}}
-li{{margin-bottom:2pt;}}
-.pgbrk{{page-break-before:always;}}
-@media print{{.pgbrk{{page-break-before:always;}}h1,h2{{break-after:avoid;}}.mapwrap{{break-inside:avoid;}}}}
-</style></head><body>
-{"".join(sections)}
-<script>window.onload=function(){{window.print();}}</script>
-</body></html>"""
+def build_pdf_html(systems: dict, *_args) -> str:
+    """Delegate to the shared hierarchical PDF builder in io.py."""
+    from sector_gen.io import build_print_html
+    return build_print_html(systems)
 
 
 # ---------------------------------------------------------------------------
@@ -298,9 +200,13 @@ with st.sidebar:
     st.divider()
 
     region_name = st.text_input("Region Name", "Orion")
-    sector_name = st.text_input("Sector Name", "Cassian")
-
     scope = st.selectbox("Scope", ["Subsector", "Sector", "Region"])
+
+    sector_name = "Cassian"
+    if scope != "Region":
+        sector_name = st.text_input("Sector Name", "Cassian")
+    else:
+        st.caption("Sector names are auto-generated for region scope.")
 
     subsector_letter = "A"
     n_sectors = 4
@@ -384,16 +290,117 @@ with tab_gen:
     if svg:
         st.subheader(f"{scope} Map — {rc} / {sc}")
 
-        resp = svg_responsive(svg)
-        m = re.search(r'height="([\d.]+)"', svg)
-        iframe_h = min(720, int(float(m.group(1))) + 24) if m else 600
+        iframe_h = 680
 
-        st.components.v1.html(
-            f'<div style="overflow:auto;background:#000;border-radius:6px;padding:4px;">'
-            f'{resp}</div>',
-            height=iframe_h,
-            scrolling=True,
-        )
+        map_html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box;}}
+body{{background:#000;overflow:hidden;}}
+#wrap{{position:relative;width:100%;height:{iframe_h - 4}px;overflow:hidden;
+       background:#000;border-radius:6px;cursor:grab;user-select:none;}}
+#wrap.dragging{{cursor:grabbing;}}
+#scene{{position:absolute;top:0;left:0;transform-origin:0 0;}}
+#controls{{position:absolute;top:8px;right:8px;z-index:20;
+           display:flex;flex-direction:column;gap:4px;}}
+.cb{{width:32px;height:32px;background:rgba(30,41,59,.9);color:#f1f5f9;
+     border:1px solid #475569;border-radius:4px;font-size:1.1rem;
+     cursor:pointer;display:flex;align-items:center;justify-content:center;}}
+.cb:hover{{background:#475569;}}
+#hint{{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+       background:rgba(15,23,42,.85);color:#38bdf8;border:1px solid #38bdf8;
+       padding:3px 12px;border-radius:20px;font-size:.72rem;font-family:sans-serif;
+       pointer-events:none;opacity:0;transition:opacity .3s;white-space:nowrap;}}
+#wrap:hover #hint{{opacity:1;}}
+</style></head><body>
+<div id="wrap">
+  <div id="controls">
+    <div class="cb" id="zi">+</div>
+    <div class="cb" id="zo">−</div>
+    <div class="cb" id="zr">⟲</div>
+  </div>
+  <div id="hint">Scroll to zoom · Drag to pan</div>
+  <div id="scene">{svg}</div>
+</div>
+<script>
+(function(){{
+  var wrap  = document.getElementById('wrap');
+  var scene = document.getElementById('scene');
+  var sc = 1, tx = 0, ty = 0, drag = false, ox, oy;
+
+  function apply(){{
+    scene.style.transform = 'translate('+tx+'px,'+ty+'px) scale('+sc+')';
+  }}
+
+  function fit(){{
+    var el = scene.querySelector('svg');
+    if (!el) return;
+    var W = parseFloat(el.getAttribute('width'))  || el.viewBox.baseVal.width  || 800;
+    var H = parseFloat(el.getAttribute('height')) || el.viewBox.baseVal.height || 600;
+    var cW = wrap.offsetWidth || 800;
+    var cH = wrap.offsetHeight || {iframe_h - 4};
+    sc = Math.min(cW / W, cH / H);
+    tx = (cW - W * sc) / 2;
+    ty = (cH - H * sc) / 2;
+    apply();
+  }}
+
+  function zoom(factor, cx, cy){{
+    tx = cx - (cx - tx) * factor;
+    ty = cy - (cy - ty) * factor;
+    sc *= factor;
+    apply();
+  }}
+
+  document.getElementById('zi').onclick = function(e){{
+    e.stopPropagation();
+    zoom(1.25, wrap.offsetWidth / 2, wrap.offsetHeight / 2);
+  }};
+  document.getElementById('zo').onclick = function(e){{
+    e.stopPropagation();
+    zoom(0.8, wrap.offsetWidth / 2, wrap.offsetHeight / 2);
+  }};
+  document.getElementById('zr').onclick = function(e){{
+    e.stopPropagation(); fit();
+  }};
+
+  wrap.addEventListener('wheel', function(e){{
+    e.preventDefault();
+    var r = wrap.getBoundingClientRect();
+    zoom(e.deltaY < 0 ? 1.1 : 0.9, e.clientX - r.left, e.clientY - r.top);
+  }}, {{passive: false}});
+
+  wrap.addEventListener('mousedown', function(e){{
+    if (e.target.classList.contains('cb') || e.button !== 0) return;
+    drag = true; wrap.classList.add('dragging');
+    ox = e.clientX - tx; oy = e.clientY - ty;
+  }});
+  window.addEventListener('mousemove', function(e){{
+    if (!drag) return;
+    tx = e.clientX - ox; ty = e.clientY - oy; apply();
+  }});
+  window.addEventListener('mouseup', function(){{
+    drag = false; wrap.classList.remove('dragging');
+  }});
+
+  wrap.addEventListener('touchstart', function(e){{
+    if (e.touches.length === 1){{
+      drag = true; ox = e.touches[0].clientX - tx; oy = e.touches[0].clientY - ty;
+    }}
+  }}, {{passive: true}});
+  window.addEventListener('touchmove', function(e){{
+    if (!drag || e.touches.length !== 1) return;
+    tx = e.touches[0].clientX - ox; ty = e.touches[0].clientY - oy; apply();
+  }}, {{passive: true}});
+  window.addEventListener('touchend', function(){{ drag = false; }});
+
+  window.addEventListener('load', fit);
+  setTimeout(fit, 50);
+}})();
+</script>
+</body></html>"""
+
+        st.components.v1.html(map_html, height=iframe_h, scrolling=False)
 
         # System details picker
         visible = scope_filter(systems, scope, rc, sid, subsector_letter)
