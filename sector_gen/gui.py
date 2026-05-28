@@ -563,12 +563,14 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             self.handle_system_rules()
         elif self.path == '/guide':
             self.handle_user_guide()
+        elif self.path == '/license':
+            self.handle_license()
         else:
             self.send_error(404)
 
-    def handle_system_rules(self):
+    def _render_markdown_page(self, title, file_path):
         try:
-            with open('sector_generation_system.md', 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
             
             import re
@@ -620,12 +622,14 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
 
                 # Tables (GFM style)
                 if '|' in line:
+                    # Filter out empty parts but keep internal structure
                     parts = [p.strip() for p in line.split('|')]
                     if len(parts) > 1 and parts[0] == '': parts = parts[1:]
                     if len(parts) > 1 and parts[-1] == '': parts = parts[:-1]
                     
                     if not parts: continue
                         
+                    # Detect separator line
                     if all(re.match(r'^-+$', p) or re.match(r'^:?-+:?$', p) for p in parts):
                         if in_table and not table_header_processed:
                             table_header_processed = True
@@ -670,7 +674,7 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
-                <title>System Rules - Space Sector Generator</title>
+                <title>{title} - Space Sector Generator</title>
                 <style>
                     body {{ font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; max-width: 1000px; margin: 0 auto; padding: 3rem; background: #0f172a; color: #f1f5f9; }}
                     h1, h2, h3 {{ color: #38bdf8; margin-top: 2.5rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }}
@@ -703,31 +707,41 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             self.send_error(500, str(e))
 
+    def handle_license(self):
+        try:
+            license_path = Path(__file__).parent / 'LICENSE'
+            content = license_path.read_text(encoding='utf-8')
+            page = f"""
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <title>MIT License - Space Sector Generator</title>
+                <style>
+                    body {{ font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 3rem; background: #0f172a; color: #f1f5f9; }}
+                    pre {{ background: #000; padding: 2rem; border-radius: 8px; border: 1px solid #334155; white-space: pre-wrap; font-family: 'Consolas', monospace; color: #e2e8f0; }}
+                    a.back {{ color: #38bdf8; text-decoration: none; font-weight: 600; display: inline-block; margin-bottom: 2rem; }}
+                </style>
+            </head>
+            <body>
+                <a href="/" class="back">&larr; Back to Generator</a>
+                <h1>MIT License</h1>
+                <pre>{content}</pre>
+            </body>
+            </html>
+            """
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/html')
+            self.end_headers()
+            self.wfile.write(page.encode('utf-8'))
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_system_rules(self):
+        self._render_markdown_page("System Rules", 'sector_generation_system.md')
+
     def handle_user_guide(self):
-        page = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <title>User Guide - Space Sector Generator</title>
-            <style>
-                body { font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: #f1f5f9; margin: 0; }
-                h1 { color: #38bdf8; }
-                p { color: #cbd5e1; font-size: 1.2rem; }
-                a { color: #38bdf8; text-decoration: none; margin-top: 2rem; font-weight: 600; }
-            </style>
-        </head>
-        <body>
-            <h1>User Guide</h1>
-            <p>Content is currently under development. Check back soon!</p>
-            <a href="/">&larr; Back to Generator</a>
-        </body>
-        </html>
-        """
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/html')
-        self.end_headers()
-        self.wfile.write(page.encode('utf-8'))
+        self._render_markdown_page("User Guide", 'USER_GUIDE.md')
 
     def do_POST(self):
         content_length = int(self.headers['Content-Length'])
