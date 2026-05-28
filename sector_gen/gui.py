@@ -535,7 +535,22 @@ HTML_TEMPLATE = """
 """
 
 # Global storage for current session
+WORKSPACE_PATH = Path("workspace.tsv")
 current_systems = {}
+
+def load_workspace():
+    global current_systems
+    if WORKSPACE_PATH.exists():
+        from .io import load_tsv
+        current_systems = load_tsv(WORKSPACE_PATH)
+        print(f"Loaded {len(current_systems)} systems from {WORKSPACE_PATH}")
+    else:
+        current_systems = {}
+
+def save_workspace():
+    from .io import save_tsv
+    save_tsv(WORKSPACE_PATH, current_systems)
+    print(f"Auto-saved workspace to {WORKSPACE_PATH}")
 
 class SGSHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -605,14 +620,12 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
 
                 # Tables (GFM style)
                 if '|' in line:
-                    # Filter out empty parts but keep internal structure
                     parts = [p.strip() for p in line.split('|')]
                     if len(parts) > 1 and parts[0] == '': parts = parts[1:]
                     if len(parts) > 1 and parts[-1] == '': parts = parts[:-1]
                     
                     if not parts: continue
                         
-                    # Detect separator line
                     if all(re.match(r'^-+$', p) or re.match(r'^:?-+:?$', p) for p in parts):
                         if in_table and not table_header_processed:
                             table_header_processed = True
@@ -743,19 +756,26 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         
         register = load_register('default')
         
-        systems = {}
+        new_systems = {}
         for cid in hexes_for_subsector(region_code, sector_code, subsector_letter):
             s = generate_system(cid, sector_id, density=density, register=register)
             if s:
-                systems[cid] = s
+                new_systems[cid] = s
         
-        # Run network pass
-        systems, _ = run_network_pass(systems)
-        current_systems = systems
-        print(f"Generated {len(current_systems)} systems for {region_code}-{sector_id}-{subsector_letter}")
+        # Additive logic: merge with current workspace (existing wins)
+        from .io import merge
+        current_systems = merge(current_systems, new_systems)
         
-        # Render SVG
-        svg = render_subsector_to_svg(systems, f"{region_code}-{sector_id}-{subsector_letter}")
+        # Run network pass and resolve links across the WHOLE workspace
+        current_systems, _ = run_network_pass(current_systems)
+        resolve_pending_links(current_systems)
+        
+        # Auto-save
+        save_workspace()
+        
+        # Render ONLY the requested subsector for visual feedback
+        # (Pass full dict so routes cross-subsector are rendered if they exist)
+        svg = render_subsector_to_svg(current_systems, f"{region_code}-{sector_id}-{subsector_letter}")
         
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
@@ -815,6 +835,7 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
                 tmp_path.unlink()
 
 def run_server():
+    load_workspace()
     with socketserver.TCPServer(("", PORT), SGSHandler) as httpd:
         print(f"Serving GUI at http://localhost:{PORT}")
         print("Press Ctrl+C to stop.")
