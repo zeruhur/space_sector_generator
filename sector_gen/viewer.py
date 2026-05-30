@@ -1,7 +1,108 @@
+import re
 from .generator import parse_profile
 
-# Translation maps based on sector_generation_system.md
+# Translation maps ... (keep existing maps)
 
+def render_markdown(text: str) -> str:
+    """Convert a Markdown string to an HTML fragment.
+    Supports headers, bold, inline code, code blocks, lists, and tables.
+    """
+    lines = text.splitlines()
+    html_lines = []
+    in_code = False
+    in_list = False
+    in_table = False
+    table_header_processed = False
+
+    for line in lines:
+        line = line.rstrip()
+        
+        # Code blocks
+        if line.startswith('```'):
+            if not in_code:
+                html_lines.append('<pre><code>')
+                in_code = True
+            else:
+                html_lines.append('</code></pre>')
+                in_code = False
+            continue
+        
+        if in_code:
+            html_lines.append(line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+            continue
+
+        # Escape HTML in normal text
+        line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        
+        # Horizontal rule
+        if line == '---':
+            html_lines.append('<hr>')
+            continue
+
+        # Headers
+        if line.startswith('# '):
+            html_lines.append(f'<h1>{line[2:]}</h1>')
+            continue
+        if line.startswith('## '):
+            html_lines.append(f'<h2>{line[3:]}</h2>')
+            continue
+        if line.startswith('### '):
+            html_lines.append(f'<h3>{line[4:]}</h3>')
+            continue
+
+        # Bold and Inline Code
+        line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
+        line = re.sub(r'`(.*?)`', r'<code>\1</code>', line)
+
+        # Tables (GFM style)
+        if '|' in line:
+            parts = [p.strip() for p in line.split('|')]
+            if len(parts) > 1 and parts[0] == '': parts = parts[1:]
+            if len(parts) > 1 and parts[-1] == '': parts = parts[:-1]
+            
+            if not parts: continue
+                
+            # Detect separator line
+            if all(re.match(r'^-+$', p) or re.match(r'^:?-+:?$', p) for p in parts):
+                if in_table and not table_header_processed:
+                    table_header_processed = True
+                    continue
+            
+            if not in_table:
+                html_lines.append('<table>')
+                in_table = True
+                table_header_processed = False
+                html_lines.append('<thead><tr>' + ''.join(f'<th>{p}</th>' for p in parts) + '</tr></thead><tbody>')
+            else:
+                html_lines.append('<tr>' + ''.join(f'<td>{p}</td>' for p in parts) + '</tr>')
+            continue
+        elif in_table:
+            html_lines.append('</tbody></table>')
+            in_table = False
+
+        # Lists
+        if line.startswith('* ') or line.startswith('- '):
+            if not in_list:
+                html_lines.append('<ul>')
+                in_list = True
+            html_lines.append(f'<li>{line[2:]}</li>')
+            continue
+        elif in_list:
+            html_lines.append('</ul>')
+            in_list = False
+
+        # Paragraphs
+        if line.strip():
+            html_lines.append(f'<p>{line}</p>')
+        else:
+            html_lines.append('<br>')
+
+    if in_table: html_lines.append('</tbody></table>')
+    if in_list: html_lines.append('</ul>')
+    
+    return '\n'.join(html_lines)
+
+# Existing translation maps follow...
 AC_MAP = {
     0: "Open, well-serviced, no complications",
     1: "Standard, minor friction",
@@ -143,6 +244,12 @@ def translate_system_html(system: dict) -> str:
         html += "<h4>📝 GM Notes</h4>"
         html += f"<p><i>{notes}</i></p>"
     
+    expansion = system.get('expansion', '')
+    if expansion:
+        html += "<h4>🔭 Detailed System Expansion</h4>"
+        exp_html = render_markdown(expansion)
+        html += f"<div style='background: rgba(56, 189, 248, 0.05); padding: 1rem; border-radius: 4px; border-left: 4px solid var(--accent); color: #cbd5e1; font-size: 0.95em;'>{exp_html}</div>"
+
     html += "<p><small><i>(Space for GM annotations and local events)</i></small></p>"
     
     return html
@@ -179,6 +286,12 @@ def translate_system(system: dict) -> str:
     if notes:
         lines.append("#### 📝 GM Notes")
         lines.append(f"*{notes}*")
+        lines.append("")
+
+    expansion = system.get('expansion', '')
+    if expansion:
+        lines.append("#### 🔭 Detailed System Expansion")
+        lines.append(expansion)
         lines.append("")
 
     lines.append("*(Space for GM annotations and local events)*")

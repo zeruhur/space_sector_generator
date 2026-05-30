@@ -232,6 +232,7 @@ HTML_TEMPLATE = """
             <nav class="nav-links">
                 <a href="/" class="active">Generator</a>
                 <a href="/system" target="_blank">System Rules ↗</a>
+                <a href="/expansion" target="_blank">Expansion Rules ↗</a>
                 <a href="/guide" target="_blank">User Guide ↗</a>
             </nav>
         </div>
@@ -284,6 +285,10 @@ HTML_TEMPLATE = """
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
                 <input type="checkbox" id="overwrite" style="width: auto;">
                 <label for="overwrite" style="color: #94a3b8; cursor: pointer;">Overwrite if exists</label>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="expanded" style="width: auto;">
+                <label for="expanded" style="color: #94a3b8; cursor: pointer;">Expanded Detail</label>
             </div>
             <div style="display: flex; gap: 0.5rem;">
                 <button id="view-btn" style="flex: 1; background: #475569; color: white;">View Map</button>
@@ -370,7 +375,8 @@ HTML_TEMPLATE = """
                 subsector: document.getElementById('subsector').value,
                 sectors: parseInt(document.getElementById('sectors-count').value) || 4,
                 density: document.getElementById('density').value,
-                overwrite: document.getElementById('overwrite').checked
+                overwrite: document.getElementById('overwrite').checked,
+                expanded: document.getElementById('expanded').checked
             };
 
             try {
@@ -643,14 +649,14 @@ HTML_TEMPLATE = """
 </html>
 """
 
-def _gen_sector(region_code, sector_code, sector_id, density, register):
+def _gen_sector(region_code, sector_code, sector_id, density, register, expanded=False):
     """Generate all 16 subsectors for one sector, network-passing each subsector."""
     from .io import merge as io_merge
     new_systems = {}
     for sub in SUBSECTOR_LETTERS:
         sub_new = {}
         for cid in hexes_for_subsector(region_code, sector_code, sub):
-            s = generate_system(cid, sector_id, density=density, register=register)
+            s = generate_system(cid, sector_id, density=density, register=register, expanded=expanded)
             if s:
                 sub_new[cid] = s
         run_network_pass(sub_new)
@@ -658,7 +664,7 @@ def _gen_sector(region_code, sector_code, sector_id, density, register):
     return new_systems
 
 
-def _gen_region(region_code, n_sectors, density, register):
+def _gen_region(region_code, n_sectors, density, register, expanded=False):
     """Generate n_sectors auto-named sectors for a region. Returns (systems, sectors_list)."""
     new_systems = {}
     sectors_list = []
@@ -678,7 +684,7 @@ def _gen_region(region_code, n_sectors, density, register):
             )
         used_codes.add(sc)
         sec_id = f"{sc}-01"
-        new_systems.update(_gen_sector(region_code, sc, sec_id, density, register))
+        new_systems.update(_gen_sector(region_code, sc, sec_id, density, register, expanded=expanded))
         sectors_list.append((region_code, sc))
     return new_systems, sectors_list
 
@@ -710,6 +716,8 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             self.wfile.write(HTML_TEMPLATE.encode('utf-8'))
         elif self.path == '/system':
             self.handle_system_rules()
+        elif self.path == '/expansion':
+            self.handle_expansion_rules()
         elif self.path == '/guide':
             self.handle_user_guide()
         elif self.path == '/license':
@@ -719,104 +727,9 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
 
     def _render_markdown_page(self, title, file_path):
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-            
-            import re
-            html_lines = []
-            in_code = False
-            in_list = False
-            in_table = False
-            table_header_processed = False
-
-            for line in lines:
-                line = line.rstrip()
-                
-                # Code blocks
-                if line.startswith('```'):
-                    if not in_code:
-                        html_lines.append('<pre><code>')
-                        in_code = True
-                    else:
-                        html_lines.append('</code></pre>')
-                        in_code = False
-                    continue
-                
-                if in_code:
-                    html_lines.append(line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
-                    continue
-
-                # Escape HTML in normal text
-                line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-                
-                # Horizontal rule
-                if line == '---':
-                    html_lines.append('<hr>')
-                    continue
-
-                # Headers
-                if line.startswith('# '):
-                    html_lines.append(f'<h1>{line[2:]}</h1>')
-                    continue
-                if line.startswith('## '):
-                    html_lines.append(f'<h2>{line[3:]}</h2>')
-                    continue
-                if line.startswith('### '):
-                    html_lines.append(f'<h3>{line[4:]}</h3>')
-                    continue
-
-                # Bold and Inline Code
-                line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
-                line = re.sub(r'`(.*?)`', r'<code>\1</code>', line)
-
-                # Tables (GFM style)
-                if '|' in line:
-                    # Filter out empty parts but keep internal structure
-                    parts = [p.strip() for p in line.split('|')]
-                    if len(parts) > 1 and parts[0] == '': parts = parts[1:]
-                    if len(parts) > 1 and parts[-1] == '': parts = parts[:-1]
-                    
-                    if not parts: continue
-                        
-                    # Detect separator line
-                    if all(re.match(r'^-+$', p) or re.match(r'^:?-+:?$', p) for p in parts):
-                        if in_table and not table_header_processed:
-                            table_header_processed = True
-                            continue
-                    
-                    if not in_table:
-                        html_lines.append('<table>')
-                        in_table = True
-                        table_header_processed = False
-                        html_lines.append('<thead><tr>' + ''.join(f'<th>{p}</th>' for p in parts) + '</tr></thead><tbody>')
-                    else:
-                        html_lines.append('<tr>' + ''.join(f'<td>{p}</td>' for p in parts) + '</tr>')
-                    continue
-                elif in_table:
-                    html_lines.append('</tbody></table>')
-                    in_table = False
-
-                # Lists
-                if line.startswith('* ') or line.startswith('- '):
-                    if not in_list:
-                        html_lines.append('<ul>')
-                        in_list = True
-                    html_lines.append(f'<li>{line[2:]}</li>')
-                    continue
-                elif in_list:
-                    html_lines.append('</ul>')
-                    in_list = False
-
-                # Paragraphs
-                if line.strip():
-                    html_lines.append(f'<p>{line}</p>')
-                else:
-                    html_lines.append('<br>')
-
-            if in_table: html_lines.append('</tbody></table>')
-            if in_list: html_lines.append('</ul>')
-            
-            html_content = '\n'.join(html_lines)
+            content = Path(file_path).read_text(encoding='utf-8')
+            from .viewer import render_markdown
+            html_content = render_markdown(content)
             
             page = f"""
             <!DOCTYPE html>
@@ -889,6 +802,9 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
     def handle_system_rules(self):
         self._render_markdown_page("System Rules", 'sector_generation_system.md')
 
+    def handle_expansion_rules(self):
+        self._render_markdown_page("Expansion Rules", 'system_detail_expansion.md')
+
     def handle_user_guide(self):
         self._render_markdown_page("User Guide", 'USER_GUIDE.md')
 
@@ -924,6 +840,7 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         global current_systems
         density = data.get('density', 'standard')
         overwrite = data.get('overwrite', False)
+        expanded = data.get('expanded', False)
         scope = data.get('scope', 'subsector')
 
         region_code, sector_code, sector_id, subsector_letter = self._parse_scope(data)
@@ -939,11 +856,11 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
 
             new_systems = {}
             for cid in hexes_for_subsector(region_code, sector_code, subsector_letter):
-                s = generate_system(cid, sector_id, density=density, register=register)
+                s = generate_system(cid, sector_id, density=density, register=register, expanded=expanded)
                 if s:
                     new_systems[cid] = s
 
-            current_systems = merge(current_systems, new_systems)
+            current_systems.update(new_systems)
 
             sub_systems = {
                 sid: s for sid, s in current_systems.items()
@@ -963,8 +880,8 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
                                    if not (s.get('region') == region_code and s.get('sector') == sector_id)}
                 print(f"Overwriting sector {sector_id}...")
 
-            new_systems = _gen_sector(region_code, sector_code, sector_id, density, register)
-            current_systems = merge(current_systems, new_systems)
+            new_systems = _gen_sector(region_code, sector_code, sector_id, density, register, expanded=expanded)
+            current_systems.update(new_systems)
             resolve_pending_links(current_systems)
             save_workspace()
 
@@ -977,8 +894,8 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
                                    if s.get('region') != region_code}
                 print(f"Overwriting region {region_code}...")
 
-            new_systems, sectors_list = _gen_region(region_code, n_sectors, density, register)
-            current_systems = merge(current_systems, new_systems)
+            new_systems, sectors_list = _gen_region(region_code, n_sectors, density, register, expanded=expanded)
+            current_systems.update(new_systems)
             resolve_pending_links(current_systems)
             save_workspace()
 

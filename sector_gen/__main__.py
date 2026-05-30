@@ -30,11 +30,13 @@ def _load_register_safe(name: str) -> dict:
 
 
 def _generate_subsector(region: str, sector_name: str, sector_number: str,
-                         subsector: str, density: str, register: dict) -> dict:
+                         subsector: str, density: str, register: dict,
+                         expanded: bool = False) -> dict:
     sector_id = f"{sector_name}-{sector_number}"
     systems = {}
     for cid in hexes_for_subsector(region, sector_name, subsector):
-        s = generate_system(cid, sector_id, density=density, register=register)
+        s = generate_system(cid, sector_id, density=density, register=register,
+                            expanded=expanded)
         if s:
             systems[cid] = s
     systems, _ = run_network_pass(systems)
@@ -42,11 +44,12 @@ def _generate_subsector(region: str, sector_name: str, sector_number: str,
 
 
 def _generate_sector(region: str, sector_name: str, sector_number: str,
-                      density: str, register: dict) -> dict:
+                      density: str, register: dict, expanded: bool = False) -> dict:
     all_systems = {}
     for sub in SUBSECTOR_LETTERS:
         all_systems.update(
-            _generate_subsector(region, sector_name, sector_number, sub, density, register)
+            _generate_subsector(region, sector_name, sector_number, sub, density, register,
+                                expanded=expanded)
         )
     resolve_pending_links(all_systems)
     return all_systems
@@ -166,6 +169,7 @@ def cmd_generate(args) -> None:
     register = _load_register_safe(args.phonemes)
     scope = args.scope
     density = args.density
+    expanded = args.expanded
 
     # Load optional input TSV for code-collision checking
     existing_systems: dict = {}
@@ -203,14 +207,14 @@ def cmd_generate(args) -> None:
             except ValueError:
                 sc = f"X{i + 1:03d}"[:4]
             used_sector_codes.add(sc)
-            all_systems.update(_generate_sector(region_code, sc, '01', density, register))
+            all_systems.update(_generate_sector(region_code, sc, '01', density, register, expanded=expanded))
         resolve_pending_links(all_systems)
         _output(all_systems, args)
         return
 
     # --- sector ---
     if scope == 'sector':
-        systems = _generate_sector(region_code, sector_code, sector_number, density, register)
+        systems = _generate_sector(region_code, sector_code, sector_number, density, register, expanded=expanded)
         _output(systems, args)
         return
 
@@ -218,14 +222,14 @@ def cmd_generate(args) -> None:
     if scope == 'subsector':
         sub = _parse_subsector_letter(args.id)
         systems = _generate_subsector(region_code, sector_code, sector_number, sub,
-                                       density, register)
+                                       density, register, expanded=expanded)
         _output(systems, args)
         return
 
     # --- system ---
     if scope == 'system':
         cid, sector_id = _parse_system_local_id(args.id, region_code, sector_code, sector_number)
-        s = generate_system(cid, sector_id, density=density, register=register)
+        s = generate_system(cid, sector_id, density=density, register=register, expanded=expanded)
         if not s:
             print(f"Empty hex: {cid}", file=sys.stderr)
             sys.exit(0)
@@ -248,6 +252,7 @@ def cmd_build(args) -> None:
     register = _load_register_safe(args.phonemes)
     scope = args.scope
     density = args.density
+    expanded = args.expanded
 
     # Derive codes without exclusion — for build, the same code appearing in the
     # file is expected (we're extending an existing entity, not creating a new one).
@@ -276,14 +281,14 @@ def cmd_build(args) -> None:
     sector_number = f"{args.sector_index:02d}"
 
     if scope == 'sector':
-        new_systems = _generate_sector(region_code, sector_code, sector_number, density, register)
+        new_systems = _generate_sector(region_code, sector_code, sector_number, density, register, expanded=expanded)
     elif scope == 'subsector':
         sub = _parse_subsector_letter(args.id)
         new_systems = _generate_subsector(region_code, sector_code, sector_number, sub,
-                                           density, register)
+                                           density, register, expanded=expanded)
     elif scope == 'system':
         cid, sector_id = _parse_system_local_id(args.id, region_code, sector_code, sector_number)
-        s = generate_system(cid, sector_id, density=density, register=register)
+        s = generate_system(cid, sector_id, density=density, register=register, expanded=expanded)
         new_systems = {cid: s} if s else {}
         if new_systems:
             new_systems, _ = run_network_pass(new_systems)
@@ -327,6 +332,7 @@ def cmd_reroll(args) -> None:
     seed = sid + f"-reroll{n}"
     old = systems[sid]
     register = _load_register_safe(args.phonemes)
+    expanded = getattr(args, 'expanded', False)
 
     import random
     from .generator import (step_1_hz, step_2_rx, step_3_pp, step_4_pw,
@@ -349,9 +355,14 @@ def cmd_reroll(args) -> None:
         'name': new_name,
         'ni': '',
         'nr': '',
+        'expansion': '',
         '_ac': ac, '_hz': hz, '_rx': rx, '_pp': pp, '_pw': pw, '_tn': tn, '_dx': dx,
         '_col': int(old['col']), '_row': int(old['row']),
     })
+
+    if expanded:
+        from .expansion import expand_system
+        systems[sid]['expansion'] = expand_system(systems[sid])
 
     sub = old['subsector']
     sub_systems = {k: v for k, v in systems.items() if v.get('subsector') == sub}
@@ -508,6 +519,8 @@ def build_parser() -> argparse.ArgumentParser:
                      choices=['sparse', 'standard', 'dense', 'cluster'])
     gen.add_argument('--phonemes', default=DEFAULT_PHONEMES,
                      help='Phoneme register name (default, angular, liquid, eastern)')
+    gen.add_argument('--expanded', action='store_true',
+                     help='Generate fully detailed system expansions (stars, planets, etc.)')
     gen.add_argument('--input', default=None,
                      help='Existing TSV to check for code collisions before generating')
     gen.add_argument('--output', default=None, help='TSV output path (default: stdout)')
@@ -529,6 +542,8 @@ def build_parser() -> argparse.ArgumentParser:
     bld.add_argument('--density', default=DEFAULT_DENSITY,
                      choices=['sparse', 'standard', 'dense', 'cluster'])
     bld.add_argument('--phonemes', default=DEFAULT_PHONEMES)
+    bld.add_argument('--expanded', action='store_true',
+                     help='Generate fully detailed system expansions (stars, planets, etc.)')
     bld.add_argument('--output', default=None,
                      help='Output path (default: overwrite input)')
 
@@ -538,6 +553,7 @@ def build_parser() -> argparse.ArgumentParser:
     rrl.add_argument('--id', required=True, help='Full canonical ID of the system to reroll')
     rrl.add_argument('--reroll-index', type=int, default=1, dest='reroll_index',
                      help='Integer suffix for the reroll seed (default: 1)')
+    rrl.add_argument('--expanded', action='store_true')
     rrl.add_argument('--phonemes', default=DEFAULT_PHONEMES)
     rrl.add_argument('--output', default=None)
 

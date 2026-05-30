@@ -103,7 +103,7 @@ def get_codes(region_name: str, sector_name: str) -> tuple:
     return rc, sc, f"{sc}-01"
 
 
-def do_generate(rc, sc, sid, scope, sub, n_sec, density, overwrite) -> None:
+def do_generate(rc, sc, sid, scope, sub, n_sec, density, overwrite, expanded=False) -> None:
     register = load_register("default")
     systems = dict(st.session_state.systems)
 
@@ -113,10 +113,10 @@ def do_generate(rc, sc, sid, scope, sub, n_sec, density, overwrite) -> None:
             systems = {k: v for k, v in systems.items() if k not in hexes}
         new = {}
         for cid in hexes_for_subsector(rc, sc, sub):
-            s = generate_system(cid, sid, density=density, register=register)
+            s = generate_system(cid, sid, density=density, register=register, expanded=expanded)
             if s:
                 new[cid] = s
-        systems = merge(systems, new)
+        systems.update(new)
         sub_s = {k: v for k, v in systems.items()
                  if v.get("region") == rc and v.get("sector") == sid
                  and v.get("subsector") == sub}
@@ -127,15 +127,15 @@ def do_generate(rc, sc, sid, scope, sub, n_sec, density, overwrite) -> None:
         if overwrite:
             systems = {k: v for k, v in systems.items()
                        if not (v.get("region") == rc and v.get("sector") == sid)}
-        systems = merge(systems, _gen_sector(rc, sc, sid, density, register))
+        systems.update(_gen_sector(rc, sc, sid, density, register, expanded=expanded))
         resolve_pending_links(systems)
 
     else:  # Region
         n = max(1, int(n_sec))
         if overwrite:
             systems = {k: v for k, v in systems.items() if v.get("region") != rc}
-        new, _ = _gen_region(rc, n, density, register)
-        systems = merge(systems, new)
+        new, _ = _gen_region(rc, n, density, register, expanded=expanded)
+        systems.update(new)
         resolve_pending_links(systems)
 
     st.session_state.systems = systems
@@ -218,6 +218,7 @@ with st.sidebar:
         ))
 
     density = st.selectbox("Density", ["sparse", "standard", "dense", "cluster"], index=1)
+    expanded = st.checkbox("Expanded Detail")
     overwrite = st.checkbox("Overwrite if exists")
 
     st.divider()
@@ -276,7 +277,7 @@ with tab_gen:
     if generate_clicked:
         with st.spinner(f"Generating {scope.lower()}…"):
             try:
-                do_generate(rc, sc, sid, scope, subsector_letter, n_sectors, density, overwrite)
+                do_generate(rc, sc, sid, scope, subsector_letter, n_sectors, density, overwrite, expanded=expanded)
                 st.success(
                     f"✓ {scope} generated — workspace now has "
                     f"{len(st.session_state.systems)} systems (auto-saved to localStorage)"
@@ -480,8 +481,19 @@ with tab_guide:
         st.warning("STREAMLIT_GUIDE.md not found.")
 
 with tab_rules:
-    rules = Path("sector_generation_system.md")
-    if rules.exists():
-        st.markdown(rules.read_text(encoding="utf-8"))
-    else:
-        st.warning("sector_generation_system.md not found.")
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        st.subheader("Core System Rules")
+        rules = Path("sector_generation_system.md")
+        if rules.exists():
+            st.markdown(rules.read_text(encoding="utf-8"))
+        else:
+            st.warning("sector_generation_system.md not found.")
+    
+    with col_r2:
+        st.subheader("Expansion Rules")
+        expansion_rules = Path("system_detail_expansion.md")
+        if expansion_rules.exists():
+            st.markdown(expansion_rules.read_text(encoding="utf-8"))
+        else:
+            st.warning("system_detail_expansion.md not found.")

@@ -237,7 +237,7 @@ def parse_profile(profile: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def generate_system(canonical_id: str, sector_id: str, density: str = 'standard',
-                    register: dict = None) -> dict | None:
+                    register: dict = None, expanded: bool = False) -> dict | None:
     """Generate a single system. Returns None if the hex is empty."""
     rng = random.Random(canonical_id)
 
@@ -257,7 +257,7 @@ def generate_system(canonical_id: str, sector_id: str, density: str = 'standard'
     from .names import generate_name
     name = generate_name(register, canonical_id) if register else canonical_id
 
-    return {
+    system = {
         'id': canonical_id,
         'profile': build_profile(ac, hz, rx, pp, pw, tn, dx),
         'name': name,
@@ -269,6 +269,7 @@ def generate_system(canonical_id: str, sector_id: str, density: str = 'standard'
         'ni': '',
         'nr': '',
         'notes': '',
+        'expansion': '',
         # Raw fields for the network pass (not written to TSV)
         '_ac': ac,
         '_hz': hz,
@@ -280,6 +281,12 @@ def generate_system(canonical_id: str, sector_id: str, density: str = 'standard'
         '_col': parts['col'],
         '_row': parts['row'],
     }
+
+    if expanded:
+        from .expansion import expand_system
+        system['expansion'] = expand_system(system)
+
+    return system
 
 
 def ensure_raw_fields(system: dict) -> dict:

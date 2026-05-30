@@ -6,7 +6,7 @@ from pathlib import Path
 from .generator import parse_profile, ensure_raw_fields
 
 TSV_FIELDS = ['id', 'profile', 'name', 'region', 'sector', 'subsector', 'col', 'row',
-              'ni', 'nr', 'notes']
+              'ni', 'nr', 'notes', 'expansion']
 
 
 def load_tsv(path: Path) -> dict:
@@ -155,6 +155,11 @@ def export_markdown(path: Path, systems: dict) -> None:
             lines += ['**Routes**', ''] + [f'- `{tgt}` ({tier})' for tgt, tier in routes] + ['']
         if free_notes:
             lines += ['**GM Notes**', ''] + [f'*{n}*' for n in free_notes] + ['']
+        
+        expansion = s.get('expansion', '')
+        if expansion:
+            lines += ['**Detailed System Expansion**', '', expansion, '']
+
         lines += ['*(Space for GM annotations and local events)*', '']
         return '\n'.join(lines)
 
@@ -294,6 +299,13 @@ def build_print_html(systems: dict) -> str:
             html += '</ul>'
         if free_notes:
             html += f'<p><b>GM Notes:</b> <i>{"; ".join(free_notes)}</i></p>'
+        
+        expansion = s.get('expansion', '')
+        if expansion:
+            from .viewer import render_markdown
+            exp_html = render_markdown(expansion)
+            html += f'<p><b>Detailed System Expansion:</b></p><div style="background: #f9f9f9; padding: 10pt; border-left: 3pt solid #38bdf8; margin: 10pt 0; color: #444; font-size: 9pt;">{exp_html}</div>'
+
         html += '<p><small><i>(Space for GM annotations and local events)</i></small></p>'
         return html
 

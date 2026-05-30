@@ -35,11 +35,13 @@ The GUI operates in **Workspace Mode**:
 ### Interactivity
 - **Zoom & Pan:** Use the **mouse wheel** to zoom and **click-and-drag** to pan across the sector map.
 - **Click for Details:** Click any system (dot or name) on the map to display its **System Detail Sheet** below the viewer.
+- **Expanded Detail:** Toggle the "Expanded Detail" checkbox before generating to create fully detailed system records (stars, planets, moons, etc.).
 - **Natural Language:** The generator automatically translates cryptic profile codes (like `32M2A3X`) into readable paragraphs for your campaign.
 
 ### Exporting your Work
-The sidebar provides five export options:
+The sidebar provides six export options:
 - **MD:** A professional Markdown report with a system index and detailed sheets.
+- **PDF:** A print-ready, hierarchical HTML report (opens in browser print dialog).
 - **JSON:** Machine-readable data for integration with other tools.
 - **TSV:** The raw "source code" of your sector.
 - **SVG:** Scalable vector map for high-quality printing.
@@ -62,17 +64,30 @@ For advanced users and automation, the CLI offers granular control.
 | `export` | Convert TSV data to Markdown or JSON. |
 | `gui` | Launch the web interface. |
 
+### The `--expanded` Flag
+Add `--expanded` to `generate`, `build`, or `reroll` to generate a full procedural record for every system. This includes astronomical data, orbital bodies, and local infrastructure.
+
 ### Example CLI Workflow
-1. **Generate a Subsector:**
-   `python -m sector_gen generate --scope subsector --region-name "Orion" --sector-name "Cassian" --id A --output my_sector.tsv`
+1. **Generate an Expanded Subsector:**
+   `python -m sector_gen generate --scope subsector --region-name "Orion" --sector-name "Cassian" --id A --expanded --output my_sector.tsv`
 2. **Add an Adjacent Subsector:**
-   `python -m sector_gen build --input my_sector.tsv --scope subsector --region-name "Orion" --sector-name "Cassian" --id B`
-3. **View a Specific System:**
-   `python -m sector_gen view --input my_sector.tsv --id ORI-CAS-A0104`
+   `python -m sector_gen build --input my_sector.tsv --scope subsector --region-name "Orion" --sector-name "Cassian" --id B --expanded`
+3. **Reroll a specific system with details:**
+   `python -m sector_gen reroll --input my_sector.tsv --id ORI-CAS-A0104 --expanded`
 
 ---
 
 ## 🪐 Advanced Topics
+
+### Detailed System Expansion
+The **System Detail Expansion** layer turns a compact SEP profile into a playable location.
+- **Stars:** Procedural stellar architecture (spectral type, size, binary/multiple systems).
+- **Planets:** Complete inventory of gas giants, ice giants, and terrestrial worlds with unique terrains.
+- **Moons:** Natural satellites for all major bodies.
+- **Infrastructure:** Procedural space habitats, stations, bases, and colonies.
+- **Society:** Local population scale, distribution, and technology level.
+
+Access the full **Expansion Rules** via the link in the GUI header for detailed roll tables.
 
 ### Cross-Subsector Routes
 The generator handles routes that cross subsector boundaries. 
@@ -86,17 +101,18 @@ You can change the "vibe" of system names using registers:
 - `liquid`: Ancient/Organic.
 - `eastern`: Rhythmic/Ordered.
 
-**GUI Usage:** Currently uses `default`.
+**GUI Usage:** Use the sidebar dropdown.
 **CLI Usage:** Add `--phonemes liquid` to your generate command.
 
 ### Determinism
-The generator is **deterministic**. The same ID (e.g., `ORI-CAS-A0101`) will always produce the same system and name, provided you use the same version of the code. This ensures your universe remains stable.
+The generator is **deterministic**. The same ID (e.g., `ORI-CAS-A0101`) will always produce the same system and name, provided you use the same version of the code and generation flags.
 
 ---
 
 ## 📝 GM Tips
 - **Network Importance (Ni):** Focus your high-level politics on systems with Ni 4 or 5. These are the hubs that hold the sector together.
 - **Tension (Tn):** Systems with Tn 4 or 5 are in active conflict. They are perfect starting locations for adventure.
+- **Expansion Strategy:** Use **Expanded Detail** for systems where you expect significant player interaction. This provides immediate physical texture (planets, stations) without extra prep.
 - **Distinctiveness (Dx):** Use this field as your primary "Oracle" to decide what makes a system special.
 
 ---
