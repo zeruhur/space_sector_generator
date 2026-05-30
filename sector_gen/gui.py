@@ -307,6 +307,12 @@ HTML_TEMPLATE = """
             <div class="export-group">
                 <button class="export-btn" id="export-pdf-btn" style="background: #16a34a; width: 100%;">Export PDF</button>
             </div>
+
+            <div style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                <label style="margin-bottom: 0.5rem; display: block; font-size: 0.8rem; color: #94a3b8;">Import Workspace</label>
+                <input type="file" id="import-tsv-input" accept=".tsv" style="display: none;">
+                <button id="import-tsv-btn" style="width: 100%; background: #6366f1; font-size: 0.8rem;">📂 Load TSV File</button>
+            </div>
         </div>
         <div id="content">
             <div class="card" id="map-card">
@@ -616,6 +622,43 @@ HTML_TEMPLATE = """
             }
         };
 
+        const importTsvBtn = document.getElementById('import-tsv-btn');
+        const importTsvInput = document.getElementById('import-tsv-input');
+
+        importTsvBtn.onclick = () => importTsvInput.click();
+
+        importTsvInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            status.innerText = 'Importing TSV...';
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const content = event.target.result;
+                try {
+                    const response = await fetch('/api/import', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ tsv: content })
+                    });
+                    const data = await response.json();
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
+                        alert(`Successfully imported ${data.count} systems.`);
+                        document.getElementById('view-btn').click();
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert('Import failed.');
+                } finally {
+                    status.innerText = 'Ready';
+                    importTsvInput.value = '';
+                }
+            };
+            reader.readAsText(file);
+        };
+
         function attachClickHandlers() {
             const systems = document.querySelectorAll('g[id]');
             systems.forEach(s => {
@@ -821,6 +864,8 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
             self.handle_translate(data)
         elif self.path == '/api/export':
             self.handle_export(data)
+        elif self.path == '/api/import':
+            self.handle_import(data)
         elif self.path == '/api/pdf':
             self.handle_pdf(data)
         else:
@@ -986,6 +1031,59 @@ class SGSHandler(http.server.BaseHTTPRequestHandler):
         finally:
             if tmp_path.exists():
                 tmp_path.unlink()
+
+    def handle_import(self, data):
+        global current_systems
+        tsv_content = data.get('tsv', '')
+        if not tsv_content:
+            self.send_error(400, "No TSV content provided")
+            return
+        
+        import io
+        import csv
+        from .io import TSV_FIELDS
+        from .generator import parse_profile
+
+        new_systems = {}
+        f = io.StringIO(tsv_content)
+        reader = csv.DictReader(f, delimiter='\t')
+        for row in reader:
+            sid = row.get('id')
+            if not sid: continue
+            system = {k: row.get(k, '') for k in TSV_FIELDS}
+            # Repopulate raw fields for network pass
+            try:
+                fields = parse_profile(system['profile'])
+                system.update({
+                    '_ac': fields['ac'],
+                    '_hz': fields['hz'],
+                    '_rx': fields['rx'],
+                    '_pp': fields['pp'],
+                    '_pw': fields['pw'],
+                    '_tn': fields['tn'],
+                    '_dx': fields['dx'],
+                    '_col': int(system['col']),
+                    '_row': int(system['row']),
+                })
+                if fields['ni'] != '':
+                    system['_ni'] = fields['ni']
+                if fields['nr'] != '':
+                    system['_nr'] = fields['nr']
+            except (ValueError, KeyError):
+                pass
+            new_systems[sid] = system
+        
+        if not new_systems:
+            self.send_error(400, "No valid systems found in TSV")
+            return
+            
+        current_systems.update(new_systems)
+        save_workspace()
+        
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'count': len(new_systems)}).encode('utf-8'))
 
     def handle_pdf(self, data):
         if not current_systems:
