@@ -190,12 +190,11 @@ Roll 1d6 for terrain category, then roll 1d6 for the specific type within that c
 
 | 1d6 | Category |
 | :-- | :-- |
-| 1 | Hostile |
-| 2 | Cold |
-| 3 | Dry |
-| 4 | Temperate |
-| 5 | Wet |
-| 6 | Exceptional |
+| 1-2 | Hostile |
+| 3 | Cold |
+| 4 | Dry |
+| 5 | Temperate |
+| 6 | Roll 1d6: 1-3 Wet, 4-6 Exceptional |
 
 **Specific type (1d6 within category):**
 
@@ -291,12 +290,11 @@ Roll 1d6 per habitat.
 | 1d6 | Type |
 | :-- | :-- |
 | 1-2 | O'Neill Cylinder |
-| 3 | Stanford Torus |
-| 4 | Bernal Sphere |
-| 5 | Bishop Ring or Banks Orbital |
-| 6 | Roll 1d6: 1-3 McKendree Cylinder, 4-5 Dyson Sphere, 6 Ringworld |
+| 3-4 | Stanford Torus |
+| 5 | Bernal Sphere |
+| 6 | Roll 1d6: 1-3 Bishop Ring or Banks Orbital, 4-5 McKendree Cylinder, 6 Dyson Sphere or Ringworld |
 
-**Dyson Sphere and Ringworld:** if either is generated, treat all planets and moons in the system as unsettled regardless of earlier rolls, unless the referee decides otherwise.
+**Dyson Sphere or Ringworld:** if either is generated, treat all planets and moons in the system as unsettled regardless of earlier rolls, unless the referee decides otherwise.
 
 ### Habitat detail prompts
 
@@ -333,10 +331,9 @@ Roll 1d6 per station.
 | 1d6 | Type |
 | :-- | :-- |
 | 1-2 | Wheeled Station |
-| 3 | Zero-G Station |
-| 4 | Void Citadel |
+| 3-4 | Zero-G Station |
 | 5 | Domed Installation |
-| 6 | Underground Facility |
+| 6 | Roll 1d6: 1-3 Underground Facility, 4-6 Void Citadel |
 
 ### Station function
 
@@ -385,11 +382,10 @@ Roll 1d6 per colony.
 
 | 1d6 | Type |
 | :-- | :-- |
-| 1-2 | Arcology |
-| 3 | Modular Ground Installation |
-| 4 | Floating Citadel |
-| 5 | Domed City |
-| 6 | Underground Base |
+| 1-2 | Domed City |
+| 3-4 | Modular Ground Installation |
+| 5 | Underground Base |
+| 6 | Roll 1d6: 1-3 Arcology, 4-6 Floating Citadel |
 
 ### Colony prompts
 
